@@ -81,6 +81,11 @@ export interface JellyfinItem {
   SeriesId?: string;
   SeasonId?: string;
   ParentId?: string;
+  Album?: string;
+  AlbumId?: string;
+  AlbumArtist?: string;
+  Artists?: string[];
+  AlbumPrimaryImageTag?: string;
   ChildCount?: number;
   Genres?: string[];
   Studios?: Array<{ Name?: string; Id?: string }>;
