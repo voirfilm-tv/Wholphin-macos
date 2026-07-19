@@ -1,66 +1,32 @@
-# Gradle files
-.gradle/
-build/
+# Dependencies
+web/node_modules/
 
-# Local configuration file (sdk path, etc)
-local.properties
+# Production and test outputs
+web/dist/
+web/.test-dist/
+web/test-results/
+web/playwright-report/
+web/coverage/
 
-# Log/OS Files
+# Local environment
+web/.env
+web/.env.*
+!web/.env.example
+web/docker-compose.yml
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
-*.apk
-output-metadata.json
-
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
-
-# Keystore files
-*.jks
-*.keystore
-
-# Google Services (e.g. APIs or Firebase)
-google-services.json
-
-# Android Profiling
-*.hprof
-
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+# Editors and operating systems
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-local_scripts/
-app/libs/
-ffmpeg_decoder/
-app/release/
-app/debug/
-.vscode
-.kotlin
-docs/
+.idea/
+.vscode/
+*.iml
 
-# mpv
-app/src/main/obj/
-app/src/main/libs/
-app/src/main/jnilibs
-app/src/main/jnilibs/
-scripts/mpv/deps/
-scripts/mpv/prefix/
+# Temporary files
+*.tmp
+*.swp
