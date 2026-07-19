@@ -13,13 +13,13 @@ export async function renderSearch(context: ScreenContext, route: Extract<Route,
   const preferences = context.store.preferences();
   const initial = route.query ?? '';
   const recent = context.store.recentSearches();
-  const execute = async (term: string): Promise<JellyfinItem[]> => {
+  const execute = async (term: string, signal: AbortSignal = context.signal): Promise<JellyfinItem[]> => {
     const clean = term.trim();
     if (!clean) return [];
     context.store.addRecentSearch(clean);
     const result = context.demo
       ? demoItems.filter((item) => item.Name.toLocaleLowerCase().includes(clean.toLocaleLowerCase()) || item.Genres?.some((genre) => genre.toLocaleLowerCase().includes(clean.toLocaleLowerCase())))
-      : (await context.api!.search(clean, context.signal)).Items;
+      : (await context.api!.search(clean, signal)).Items;
     for (const item of result) context.items.set(item.Id, item);
     return result;
   };
@@ -46,14 +46,15 @@ export async function renderSearch(context: ScreenContext, route: Extract<Route,
       const run = async (term: string) => {
         controller?.abort();
         controller = new AbortController();
+        const currentController = controller;
         results.innerHTML = '<div class="empty"><div class="loader"></div></div>';
         try {
-          const items = await execute(term);
-          if (controller.signal.aborted) return;
+          const items = await execute(term, currentController.signal);
+          if (currentController.signal.aborted || controller !== currentController) return;
           results.innerHTML = items.length ? grouped(items) : `<div class="empty"><p>Aucun résultat pour « ${escapeHtml(term)} ».</p></div>`;
           context.focus.invalidate();
         } catch (error) {
-          if (controller.signal.aborted) return;
+          if (currentController.signal.aborted || controller !== currentController) return;
           results.innerHTML = `<div class="empty"><p>${escapeHtml(error instanceof Error ? error.message : 'Recherche impossible.')}</p></div>`;
         }
       };

@@ -1,5 +1,6 @@
 import type { JellyfinApi } from '../../core/api/client';
 import { formatClock, secondsToTicks, ticksToSeconds } from '../../core/time';
+import { escapeHtml } from '../../core/html';
 import type { JellyfinItem } from '../../types/jellyfin';
 
 export interface PlayerOptions {
@@ -17,7 +18,7 @@ export async function openPlayer(options: PlayerOptions): Promise<void> {
   shell.innerHTML = `<video playsinline></video>
     <div class="player-scrim"></div>
     <div class="player-controls">
-      <div class="player-title">${item.SeriesName ? `${item.SeriesName} — ` : ''}${item.Name}</div>
+      <div class="player-title">${escapeHtml(item.SeriesName ? `${item.SeriesName} — ${item.Name}` : item.Name)}</div>
       <div class="progress-wrap"><span data-current>0:00</span><input data-progress type="range" min="0" max="1000" value="0" aria-label="Position de lecture"><span data-duration>0:00</span></div>
       <div class="player-actions">
         <button class="btn icon" data-focusable="true" data-focus-key="player:back" data-back aria-label="Fermer">←</button>
@@ -173,7 +174,7 @@ export async function openPlayer(options: PlayerOptions): Promise<void> {
     reportTimer = window.setInterval(() => void report(false), 10_000);
     await video.play();
   } catch (error) {
-    shell.insertAdjacentHTML('beforeend', `<div class="player-error"><div><h2>Lecture impossible</h2><p>${error instanceof Error ? error.message : 'Erreur inconnue.'}</p><button class="btn primary" data-error-close>Retour</button></div></div>`);
+    shell.insertAdjacentHTML('beforeend', `<div class="player-error"><div><h2>Lecture impossible</h2><p>${escapeHtml(error instanceof Error ? error.message : 'Erreur inconnue.')}</p><button class="btn primary" data-error-close>Retour</button></div></div>`);
     shell.querySelector<HTMLElement>('[data-error-close]')!.addEventListener('click', () => void close());
   }
 }
