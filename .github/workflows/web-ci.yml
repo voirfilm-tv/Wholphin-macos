@@ -77,8 +77,11 @@ jobs:
       - uses: actions/upload-artifact@v5
         if: ${{ !cancelled() }}
         with:
-          name: wholphin-web-playwright
+          name: wholphin-web-diagnostics
           path: |
+            web/npm-install.log
+            web/typecheck.log
             web/playwright-report
             web/test-results
+          if-no-files-found: ignore
           retention-days: 30
