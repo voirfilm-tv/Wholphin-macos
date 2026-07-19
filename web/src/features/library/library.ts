@@ -7,6 +7,7 @@ import { mediaCard } from '../../ui/media';
 import { VirtualGrid } from '../../ui/virtual/virtualGrid';
 import { renderLiveTv } from '../liveTv/liveTv';
 import { renderMusic } from '../music/music';
+import { renderPhotos } from '../photos/photos';
 
 function itemTypes(collectionType?: string): string | undefined {
   if (collectionType === 'movies') return 'Movie';
@@ -28,6 +29,7 @@ function sortRequest(value: string): { sortBy: string; sortOrder: string } {
 export async function renderLibrary(context: ScreenContext, route: Extract<Route, { name: 'library' }>): Promise<ScreenResult> {
   if (route.collectionType === 'livetv') return renderLiveTv(context, route);
   if (route.collectionType === 'music') return renderMusic(context, route);
+  if (route.collectionType === 'photos') return renderPhotos(context, route);
   const preferences = context.store.preferences();
   const pageSize = 60;
   const fetchPage = async (startIndex: number, searchTerm = '', sort = 'name', signal = context.signal): Promise<QueryResult<JellyfinItem>> => {
