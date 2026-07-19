@@ -1,6 +1,6 @@
 {
   "name": "wholphin-web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src vite.config.js eslint.config.js",
     "test": "npm run test:compile && node --test tests/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run check && npm run test:e2e",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:compile": "rm -rf .test-dist && tsc -p tsconfig.test.json"
   },
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.61.1",
     "eslint": "9.39.5",
     "typescript": "5.9.2",
     "typescript-eslint": "8.64.0",
