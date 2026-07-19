@@ -47,7 +47,14 @@ jobs:
           status=$?
           cat typecheck.log
           exit $status
-      - run: npm run lint
+      - name: ESLint
+        shell: bash
+        run: |
+          set +e
+          npm run lint > lint.log 2>&1
+          status=$?
+          cat lint.log
+          exit $status
       - run: npm test
       - run: npm run build
       - name: Enforce initial asset budgets
@@ -81,6 +88,7 @@ jobs:
           path: |
             web/npm-install.log
             web/typecheck.log
+            web/lint.log
             web/playwright-report
             web/test-results
           if-no-files-found: ignore
