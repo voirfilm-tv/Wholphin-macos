@@ -32,7 +32,13 @@ jobs:
           cache: npm
           cache-dependency-path: web/package.json
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        shell: bash
+        run: |
+          set +e
+          npm install --no-audit --no-fund > npm-install.log 2>&1
+          status=$?
+          tail -n 120 npm-install.log
+          exit $status
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
