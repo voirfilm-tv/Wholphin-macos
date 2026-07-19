@@ -1,9 +1,14 @@
 import type { ScreenContext, ScreenResult } from '../../core/context';
 import { escapeHtml } from '../../core/html';
+import { getHomeDefinitions } from '../home/home';
+import { loadHomeLayout, moveHomeRow, updateHomeRow } from '../home/homeLayout';
 
-export function renderSettings(context: ScreenContext): ScreenResult {
+export async function renderSettings(context: ScreenContext): Promise<ScreenResult> {
   const preferences = context.store.preferences();
   const session = context.store.activeSession();
+  const definitions = await getHomeDefinitions(context);
+  const profileKey = context.store.profileKey();
+  const homeLayout = loadHomeLayout(profileKey, definitions);
   return {
     title: 'Paramètres',
     html: `<div class="settings-layout">
@@ -18,11 +23,34 @@ export function renderSettings(context: ScreenContext): ScreenResult {
         <label class="field">Saut avant/arrière<select data-preference="seekSeconds" data-focusable="true" data-focus-key="settings:seek"><option value="5" ${preferences.seekSeconds === 5 ? 'selected' : ''}>5 secondes</option><option value="10" ${preferences.seekSeconds === 10 ? 'selected' : ''}>10 secondes</option><option value="30" ${preferences.seekSeconds === 30 ? 'selected' : ''}>30 secondes</option></select></label>
         <label class="field">Délai du backdrop<input type="range" min="0" max="500" step="20" value="${preferences.backdropDelayMs}" data-preference="backdropDelayMs" data-focusable="true" data-focus-key="settings:backdrop"><output>${preferences.backdropDelayMs} ms</output></label>
       </section>
+      <section class="setting-card home-layout-card"><h2>Accueil</h2><p>Active, ordonne et choisis le format d’image de chaque rangée.</p>
+        <div class="home-layout-list">${homeLayout.map((row, index) => `<div class="home-layout-row" data-home-row="${escapeHtml(row.key)}">
+          <label class="switch-row"><input type="checkbox" ${row.enabled ? 'checked' : ''} data-home-enabled="${escapeHtml(row.key)}" data-focusable="true" data-focus-key="home-row:${escapeHtml(row.key)}:enabled"> <span>${escapeHtml(row.label)}</span></label>
+          <select data-home-image="${escapeHtml(row.key)}" aria-label="Format ${escapeHtml(row.label)}" data-focusable="true" data-focus-key="home-row:${escapeHtml(row.key)}:image"><option value="poster" ${row.imageType === 'poster' ? 'selected' : ''}>Poster</option><option value="landscape" ${row.imageType === 'landscape' ? 'selected' : ''}>Paysage</option></select>
+          <label class="home-title-toggle"><input type="checkbox" ${row.showTitles ? 'checked' : ''} data-home-titles="${escapeHtml(row.key)}" data-focusable="true" data-focus-key="home-row:${escapeHtml(row.key)}:titles"> Titres</label>
+          <div class="home-row-order"><button class="btn icon small" ${index === 0 ? 'disabled' : ''} data-home-move="${escapeHtml(row.key)}" data-delta="-1" data-focusable="true" data-focus-key="home-row:${escapeHtml(row.key)}:up" aria-label="Monter">↑</button><button class="btn icon small" ${index === homeLayout.length - 1 ? 'disabled' : ''} data-home-move="${escapeHtml(row.key)}" data-delta="1" data-focusable="true" data-focus-key="home-row:${escapeHtml(row.key)}:down" aria-label="Descendre">↓</button></div>
+        </div>`).join('')}</div>
+      </section>
       <section class="setting-card"><h2>Serveur</h2><p>${escapeHtml(session?.serverName ?? (context.demo ? 'Mode démo' : 'Aucun serveur'))}<br>${escapeHtml(session?.serverUrl ?? '')}<br>${escapeHtml(session?.serverVersion ?? '')}</p>
         <button class="btn" data-focusable="true" data-focus-key="settings:diagnostics" data-route="diagnostics">Diagnostics</button>
         <button class="btn" data-focusable="true" data-focus-key="settings:about" data-route="about">À propos et licences</button>
       </section>
     </div>`,
+    afterRender: () => {
+      context.root.querySelectorAll<HTMLInputElement>('[data-home-enabled]').forEach((input) => input.addEventListener('change', () => {
+        updateHomeRow(profileKey, definitions, input.dataset.homeEnabled!, { enabled: input.checked });
+      }));
+      context.root.querySelectorAll<HTMLSelectElement>('[data-home-image]').forEach((select) => select.addEventListener('change', () => {
+        updateHomeRow(profileKey, definitions, select.dataset.homeImage!, { imageType: select.value === 'landscape' ? 'landscape' : 'poster' });
+      }));
+      context.root.querySelectorAll<HTMLInputElement>('[data-home-titles]').forEach((input) => input.addEventListener('change', () => {
+        updateHomeRow(profileKey, definitions, input.dataset.homeTitles!, { showTitles: input.checked });
+      }));
+      context.root.querySelectorAll<HTMLButtonElement>('[data-home-move]').forEach((button) => button.addEventListener('click', () => {
+        moveHomeRow(profileKey, definitions, button.dataset.homeMove!, Number(button.dataset.delta) < 0 ? -1 : 1);
+        context.rerender();
+      }));
+    },
   };
 }
 

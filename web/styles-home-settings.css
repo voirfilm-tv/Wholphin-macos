@@ -1,0 +1,9 @@
+.home-layout-card { grid-column: 1 / -1; }
+.home-layout-card > p { color: var(--muted); }
+.home-layout-list { display: grid; gap: 8px; }
+.home-layout-row { display: grid; grid-template-columns: minmax(220px, 1fr) 140px 100px auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.045); }
+.home-layout-row .switch-row { margin: 0; min-width: 0; }
+.home-layout-row .switch-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-title-toggle { display: flex; gap: 7px; align-items: center; }
+.home-row-order { display: flex; gap: 6px; }
+@media (max-width: 760px) { .home-layout-row { grid-template-columns: 1fr auto; } .home-layout-row .switch-row { grid-column: 1 / -1; } }
