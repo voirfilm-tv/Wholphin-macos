@@ -10,6 +10,7 @@
     "src/core/router.ts",
     "src/core/time.ts",
     "src/core/api/client.ts",
+    "src/core/api/connectionDiagnostics.ts",
     "src/core/storage/store.ts",
     "src/types/**/*.ts"
   ]
