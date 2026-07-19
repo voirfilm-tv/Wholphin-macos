@@ -12,6 +12,7 @@ export interface VirtualGridOptions<T> {
   windowClassName?: string;
   loadMore?: () => Promise<{ items: T[]; totalCount?: number }>;
   onRendered?: () => void;
+  onFirstRendered?: () => void;
   signal?: AbortSignal;
 }
 
@@ -31,6 +32,7 @@ export class VirtualGrid<T> {
   private end = -1;
   private readonly resizeObserver: ResizeObserver;
   private destroyed = false;
+  private renderedOnce = false;
 
   constructor(private readonly options: VirtualGridOptions<T>) {
     this.items = [...options.items];
@@ -82,6 +84,12 @@ export class VirtualGrid<T> {
     this.frame = requestAnimationFrame(() => void this.render());
   }
 
+  private restoreActiveKey(key: string | undefined): void {
+    if (!key) return;
+    const replacement = Array.from(this.options.container.querySelectorAll<HTMLElement>('[data-focus-key]')).find((element) => element.dataset.focusKey === key);
+    replacement?.focus({ preventScroll: true });
+  }
+
   private async render(): Promise<void> {
     if (this.destroyed) return;
     const width = this.options.container.clientWidth;
@@ -99,12 +107,19 @@ export class VirtualGrid<T> {
     const end = Math.min(this.items.length, endRow * this.columns);
     this.options.container.style.height = `${Math.max(1, rows * this.computedRowHeight)}px`;
     if (start !== this.start || end !== this.end) {
+      const active = document.activeElement;
+      const activeKey = active instanceof HTMLElement && this.options.container.contains(active) ? active.dataset.focusKey : undefined;
       this.start = start;
       this.end = end;
       const visible = this.items.slice(start, end);
       const extraClass = this.options.windowClassName ? ` ${this.options.windowClassName}` : '';
       this.options.container.innerHTML = `<div class="virtual-grid-window${extraClass}" style="transform:translateY(${startRow * this.computedRowHeight}px);grid-template-columns:repeat(${this.columns},minmax(0,1fr));gap:${this.rowGap}px ${this.columnGap}px">${visible.map((item, offset) => this.options.renderItem(item, start + offset)).join('')}</div>`;
+      this.restoreActiveKey(activeKey);
       this.options.onRendered?.();
+      if (!this.renderedOnce) {
+        this.renderedOnce = true;
+        requestAnimationFrame(() => this.options.onFirstRendered?.());
+      }
     }
     if (this.options.loadMore && !this.loading && this.items.length < this.totalCount && end >= this.items.length - this.columns * 3) {
       this.loading = true;
