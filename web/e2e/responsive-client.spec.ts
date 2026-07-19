@@ -54,9 +54,27 @@ test('la connexion est présentée en deux étapes partageables', async ({ page 
   await expect(page.locator('[data-step-indicator="server"]')).toHaveClass(/active/);
 });
 
+test('valide le serveur avant de demander les identifiants', async ({ page }) => {
+  await page.route('https://jellyfin.example.test/System/Info/Public', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ServerName: 'Serveur Test', Version: '10.11.0', Id: 'server-test' }),
+    });
+  });
+  await page.goto('/');
+  await page.locator('#server').fill('https://jellyfin.example.test');
+  await page.locator('#server-form button[type="submit"]').click();
+  await expect(page.locator('#server-form')).toBeHidden();
+  await expect(page.locator('#account-step')).toBeVisible();
+  await expect(page.locator('#verified-server')).toContainText('Serveur Test');
+  await expect(page.locator('#verified-server')).toContainText('10.11.0');
+  await expect(page.locator('[data-step-indicator="account"]')).toHaveClass(/active/);
+});
+
 test('le shell choisit une navigation adaptée au format de fenêtre', async ({ page }, testInfo) => {
   await enterDemo(page);
-  const isDesktop = testInfo.project.name === 'chromium-desktop';
+  const isDesktop = testInfo.project.name.endsWith('-desktop');
   if (isDesktop) {
     await expect(page.locator('.side-nav')).toBeVisible();
     await expect(page.locator('.mobile-nav')).toBeHidden();
@@ -76,8 +94,8 @@ test('le parcours accueil, bibliothèque et fiche fonctionne à la souris ou au 
   await expect(page.locator('.detail-content h1')).toBeVisible();
 });
 
-test('le bureau reste utilisable entièrement au clavier', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'chromium-desktop', 'Le test clavier complet cible le format bureau.');
+test('le bureau Chromium reste utilisable entièrement au clavier', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'Le raccourci Alt+Gauche est validé sur Chromium desktop.');
   await enterDemo(page);
   const movies = await firstVisible(page, '[data-library-type="movies"]');
   await movies.focus();
