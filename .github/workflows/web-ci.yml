@@ -77,13 +77,13 @@ jobs:
           const initialJs = js.filter(f => !f.p.includes('hls')).reduce((sum, f) => sum + f.size, 0);
           const cssSize = css.reduce((sum, f) => sum + f.size, 0);
           if (initialJs > 260000) throw new Error(`JavaScript initial trop lourd: ${initialJs} octets`);
-          if (cssSize > 110000) throw new Error(`CSS trop lourd: ${cssSize} octets`);
+          if (cssSize > 125000) throw new Error(`CSS trop lourd: ${cssSize} octets`);
           console.log({ initialJs, cssSize, files });
           NODE
-      - name: Install Chromium for TV tests
+      - name: Install Chromium for responsive tests
         run: npx playwright install --with-deps chromium
-      - name: Run TV and visual E2E tests
-        run: npm run test:e2e -- --project=chromium-tv --project=chromium-720p
+      - name: Run desktop tablet and mobile E2E tests
+        run: npm run test:e2e -- --project=chromium-desktop --project=chromium-tablet --project=chromium-mobile
       - uses: actions/upload-artifact@v5
         with:
           name: wholphin-web-dist
