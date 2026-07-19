@@ -23,7 +23,7 @@
     "hls.js": "1.6.16"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
+    "@eslint/js": "9.39.5",
     "@playwright/test": "1.61.1",
     "eslint": "9.39.5",
     "typescript": "5.9.2",
