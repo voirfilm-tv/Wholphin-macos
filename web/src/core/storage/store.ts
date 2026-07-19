@@ -19,6 +19,12 @@ export interface Preferences {
   showClock: boolean;
   backdropDelayMs: number;
   highContrast: boolean;
+  subtitleFontScale: 75 | 100 | 125 | 150;
+  subtitleColor: string;
+  subtitleBackgroundColor: string;
+  subtitleBackgroundOpacity: number;
+  subtitleEdge: 'none' | 'shadow' | 'outline';
+  subtitleBold: boolean;
 }
 
 interface LegacyState {
@@ -51,6 +57,12 @@ export const defaultPreferences: Preferences = {
   showClock: true,
   backdropDelayMs: 160,
   highContrast: false,
+  subtitleFontScale: 100,
+  subtitleColor: '#ffffff',
+  subtitleBackgroundColor: '#000000',
+  subtitleBackgroundOpacity: 65,
+  subtitleEdge: 'shadow',
+  subtitleBold: false,
 };
 
 function defaults(): AppState {
@@ -70,8 +82,39 @@ function safeParse<T>(value: string | null): T | null {
   try { return JSON.parse(value) as T; } catch { return null; }
 }
 
+function validHex(value: unknown, fallback: string): string {
+  const text = String(value ?? '');
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
+}
+
 function clonePreferences(value?: Partial<Preferences>): Preferences {
-  return { ...defaultPreferences, ...(value ?? {}) };
+  const merged = { ...defaultPreferences, ...(value ?? {}) };
+  const scales = [75, 100, 125, 150] as const;
+  const edges = ['none', 'shadow', 'outline'] as const;
+  return {
+    ...merged,
+    accent: validHex(merged.accent, defaultPreferences.accent),
+    subtitleFontScale: scales.includes(merged.subtitleFontScale as (typeof scales)[number]) ? merged.subtitleFontScale : 100,
+    subtitleColor: validHex(merged.subtitleColor, '#ffffff'),
+    subtitleBackgroundColor: validHex(merged.subtitleBackgroundColor, '#000000'),
+    subtitleBackgroundOpacity: Math.max(0, Math.min(100, Number(merged.subtitleBackgroundOpacity) || 0)),
+    subtitleEdge: edges.includes(merged.subtitleEdge as (typeof edges)[number]) ? merged.subtitleEdge : 'shadow',
+    subtitleBold: Boolean(merged.subtitleBold),
+  };
+}
+
+function hexToRgba(hex: string, opacity: number): string {
+  const value = validHex(hex, '#000000').slice(1);
+  const red = Number.parseInt(value.slice(0, 2), 16);
+  const green = Number.parseInt(value.slice(2, 4), 16);
+  const blue = Number.parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${Math.max(0, Math.min(100, opacity)) / 100})`;
+}
+
+function subtitleShadow(edge: Preferences['subtitleEdge']): string {
+  if (edge === 'none') return 'none';
+  if (edge === 'outline') return '-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 2px 4px #000';
+  return '0 2px 3px #000, 0 0 5px #000';
 }
 
 function migrateLegacy(legacy: LegacyState): AppState {
@@ -149,6 +192,7 @@ export class AppStore extends EventTarget {
     this.state.demo = false;
     this.state.preferencesByProfile[key] ??= clonePreferences();
     this.state.recentSearchesByProfile[key] ??= [];
+    this.applyPreferences();
     this.save();
     return record;
   }
@@ -158,6 +202,7 @@ export class AppStore extends EventTarget {
     delete this.state.preferencesByProfile[key];
     delete this.state.recentSearchesByProfile[key];
     if (this.state.activeSessionKey === key) this.state.activeSessionKey = null;
+    this.applyPreferences();
     this.save();
   }
 
@@ -165,6 +210,7 @@ export class AppStore extends EventTarget {
     if (!this.state.sessions[key]) throw new Error('Session inconnue.');
     this.state.activeSessionKey = key;
     this.state.demo = false;
+    this.applyPreferences();
     this.save();
   }
 
@@ -173,18 +219,20 @@ export class AppStore extends EventTarget {
     this.state.activeSessionKey = null;
     this.state.preferencesByProfile.demo ??= clonePreferences();
     this.state.recentSearchesByProfile.demo ??= [];
+    this.applyPreferences();
     this.save();
   }
 
   logout(): void {
     this.state.activeSessionKey = null;
     this.state.demo = false;
+    this.applyPreferences();
     this.save();
   }
 
   updatePreferences(patch: Partial<Preferences>): void {
     const key = this.profileKey();
-    this.state.preferencesByProfile[key] = { ...this.preferences(), ...patch };
+    this.state.preferencesByProfile[key] = clonePreferences({ ...this.preferences(), ...patch });
     this.applyPreferences();
     this.save();
   }
@@ -224,6 +272,11 @@ export class AppStore extends EventTarget {
     const preferences = this.preferences();
     document.documentElement.style.setProperty('--accent', preferences.accent);
     document.documentElement.style.setProperty('--accent-soft', `${preferences.accent}33`);
+    document.documentElement.style.setProperty('--subtitle-font-size', `${preferences.subtitleFontScale}%`);
+    document.documentElement.style.setProperty('--subtitle-color', preferences.subtitleColor);
+    document.documentElement.style.setProperty('--subtitle-background', hexToRgba(preferences.subtitleBackgroundColor, preferences.subtitleBackgroundOpacity));
+    document.documentElement.style.setProperty('--subtitle-shadow', subtitleShadow(preferences.subtitleEdge));
+    document.documentElement.style.setProperty('--subtitle-weight', preferences.subtitleBold ? '700' : '500');
     document.documentElement.dataset.reducedMotion = String(preferences.reducedMotion);
     document.documentElement.dataset.highContrast = String(preferences.highContrast);
   }
