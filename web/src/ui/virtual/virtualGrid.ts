@@ -8,6 +8,8 @@ export interface VirtualGridOptions<T> {
   rowGap?: number;
   overscanRows?: number;
   totalCount?: number;
+  rowHeight?: (columnWidth: number) => number;
+  windowClassName?: string;
   loadMore?: () => Promise<{ items: T[]; totalCount?: number }>;
   onRendered?: () => void;
   signal?: AbortSignal;
@@ -24,7 +26,7 @@ export class VirtualGrid<T> {
   private loading = false;
   private columns = 1;
   private columnWidth = 0;
-  private rowHeight = 0;
+  private computedRowHeight = 0;
   private start = -1;
   private end = -1;
   private readonly resizeObserver: ResizeObserver;
@@ -86,21 +88,22 @@ export class VirtualGrid<T> {
     if (!width) return;
     this.columns = Math.max(1, Math.floor((width + this.columnGap) / (this.minColumnWidth + this.columnGap)));
     this.columnWidth = (width - (this.columns - 1) * this.columnGap) / this.columns;
-    this.rowHeight = this.columnWidth * 1.5 + 68 + this.rowGap;
+    this.computedRowHeight = this.options.rowHeight?.(this.columnWidth) ?? this.columnWidth * 1.5 + 68 + this.rowGap;
     const rows = Math.ceil(this.totalCount / this.columns);
     const containerTop = this.options.container.getBoundingClientRect().top + window.scrollY;
     const viewportTop = Math.max(0, window.scrollY - containerTop);
     const viewportBottom = viewportTop + window.innerHeight;
-    const startRow = Math.max(0, Math.floor(viewportTop / this.rowHeight) - this.overscanRows);
-    const endRow = Math.min(rows, Math.ceil(viewportBottom / this.rowHeight) + this.overscanRows);
+    const startRow = Math.max(0, Math.floor(viewportTop / this.computedRowHeight) - this.overscanRows);
+    const endRow = Math.min(rows, Math.ceil(viewportBottom / this.computedRowHeight) + this.overscanRows);
     const start = startRow * this.columns;
     const end = Math.min(this.items.length, endRow * this.columns);
-    this.options.container.style.height = `${Math.max(1, rows * this.rowHeight)}px`;
+    this.options.container.style.height = `${Math.max(1, rows * this.computedRowHeight)}px`;
     if (start !== this.start || end !== this.end) {
       this.start = start;
       this.end = end;
       const visible = this.items.slice(start, end);
-      this.options.container.innerHTML = `<div class="virtual-grid-window" style="transform:translateY(${startRow * this.rowHeight}px);grid-template-columns:repeat(${this.columns},minmax(0,1fr));gap:${this.rowGap}px ${this.columnGap}px">${visible.map((item, offset) => this.options.renderItem(item, start + offset)).join('')}</div>`;
+      const extraClass = this.options.windowClassName ? ` ${this.options.windowClassName}` : '';
+      this.options.container.innerHTML = `<div class="virtual-grid-window${extraClass}" style="transform:translateY(${startRow * this.computedRowHeight}px);grid-template-columns:repeat(${this.columns},minmax(0,1fr));gap:${this.rowGap}px ${this.columnGap}px">${visible.map((item, offset) => this.options.renderItem(item, start + offset)).join('')}</div>`;
       this.options.onRendered?.();
     }
     if (this.options.loadMore && !this.loading && this.items.length < this.totalCount && end >= this.items.length - this.columns * 3) {
