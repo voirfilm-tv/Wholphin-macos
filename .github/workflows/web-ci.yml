@@ -39,7 +39,14 @@ jobs:
           status=$?
           tail -n 120 npm-install.log
           exit $status
-      - run: npm run typecheck
+      - name: TypeScript strict check
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          status=$?
+          cat typecheck.log
+          exit $status
       - run: npm run lint
       - run: npm test
       - run: npm run build
