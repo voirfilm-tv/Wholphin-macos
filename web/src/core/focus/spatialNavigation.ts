@@ -106,6 +106,17 @@ export class SpatialNavigation {
     fallback?.element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
+  restoreRouteFocus(): boolean {
+    this.refresh();
+    const key = this.restoredFocus.get(this.routeKey);
+    if (!key) return false;
+    const candidate = this.candidates.find((entry) => entry.key === key);
+    if (!candidate) return false;
+    candidate.element.focus({ preventScroll: true });
+    candidate.element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return true;
+  }
+
   invalidate = (): void => {
     this.dirty = true;
   };
