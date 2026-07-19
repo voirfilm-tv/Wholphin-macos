@@ -1,0 +1,28 @@
+.live-tabs { display: flex; gap: 8px; padding: 16px 0 22px; overflow-x: auto; }
+.live-channel-list { display: grid; gap: 10px; max-width: 1280px; }
+.live-channel { position: relative; display: grid; grid-template-columns: 120px 56px minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%; min-height: 94px; padding: 9px 16px 13px; border: 1px solid rgba(255,255,255,.08); border-radius: 17px; background: rgba(14,14,22,.75); color: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.channel-logo { display: grid; place-items: center; width: 112px; height: 64px; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.07); }
+.channel-logo img { width: 100%; height: 100%; object-fit: contain; }
+.channel-logo.small { width: 72px; height: 42px; }
+.channel-logo-placeholder { font-size: 1.1rem; font-weight: 850; }
+.channel-number { color: var(--muted); font-weight: 800; text-align: center; }
+.channel-copy { display: grid; gap: 3px; min-width: 0; }
+.channel-copy strong, .channel-copy span, .channel-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-copy span { font-size: 1.04rem; }
+.channel-copy small { color: var(--muted); }
+.channel-live-action { font-weight: 750; }
+.channel-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.1); }
+.channel-progress span { display: block; height: 100%; background: var(--accent); }
+.guide-scroll { overflow-x: auto; padding-bottom: 18px; }
+.guide-grid { display: grid; grid-template-columns: 150px minmax(1200px, 1fr); min-width: 1350px; border: 1px solid rgba(255,255,255,.07); border-radius: 18px; overflow: hidden; background: rgba(8,8,13,.72); }
+.guide-corner, .guide-times { position: sticky; top: 0; z-index: 3; min-height: 50px; background: rgba(15,15,23,.98); border-bottom: 1px solid rgba(255,255,255,.08); }
+.guide-corner { left: 0; display: grid; place-items: center; font-weight: 800; }
+.guide-times { display: grid; grid-template-columns: repeat(8, 1fr); align-items: center; }
+.guide-times span { padding-left: 8px; color: var(--muted); border-left: 1px solid rgba(255,255,255,.06); }
+.guide-channel { position: sticky; left: 0; z-index: 2; display: flex; align-items: center; gap: 10px; min-height: 82px; padding: 8px 10px; background: rgba(15,15,23,.98); border-bottom: 1px solid rgba(255,255,255,.06); }
+.guide-track { position: relative; min-height: 82px; border-bottom: 1px solid rgba(255,255,255,.06); background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(12.5% - 1px), rgba(255,255,255,.045) calc(12.5% - 1px), rgba(255,255,255,.045) 12.5%); }
+.guide-program { position: absolute; top: 7px; bottom: 7px; display: grid; align-content: center; gap: 3px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(255,255,255,.075); color: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.guide-program.airing { background: color-mix(in srgb, var(--accent) 32%, rgba(255,255,255,.07)); }
+.guide-program strong, .guide-program small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guide-program small { color: var(--muted); }
+@media (max-width: 760px) { .live-channel { grid-template-columns: 84px 1fr; } .channel-logo { width: 80px; height: 48px; } .channel-number, .channel-live-action { display: none; } }
