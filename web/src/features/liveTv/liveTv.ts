@@ -4,6 +4,7 @@ import { attribute, escapeHtml } from '../../core/html';
 import { demoGradient } from '../../demo/catalog';
 import type { JellyfinItem, QueryResult } from '../../types/jellyfin';
 import { imageUrl, mediaCard } from '../../ui/media';
+import { cancelSeriesTimer, cancelTimer, createSeriesTimer, createTimer } from '../../core/api/liveTvTimers';
 
 type LiveTvItem = JellyfinItem & {
   StartDate?: string;
@@ -12,6 +13,10 @@ type LiveTvItem = JellyfinItem & {
   ChannelName?: string;
   ChannelNumber?: string;
   IsLive?: boolean;
+  IsSeries?: boolean;
+  TimerId?: string;
+  SeriesTimerId?: string;
+  ProgramId?: string;
 };
 
 interface LiveTvData {
@@ -35,6 +40,7 @@ function demoData(): LiveTvData {
     const start = now - HOUR + slot * HOUR;
     return {
       Id: `${channel.Id}-program-${slot}`,
+      ProgramId: `${channel.Id}-program-${slot}`,
       Name: slot === 1 ? `En direct sur ${channel.Name}` : `Programme ${slot + 1}`,
       Type: 'Program',
       ChannelId: channel.Id,
@@ -43,6 +49,7 @@ function demoData(): LiveTvData {
       EndDate: new Date(start + HOUR).toISOString(),
       Overview: 'Programme fictif utilisé uniquement pour valider l’interface Live TV.',
       IsLive: slot === 1 && channelIndex % 3 === 0,
+      IsSeries: slot % 2 === 0,
       ImageTags: { Primary: channel.ImageTags?.Primary ?? '' },
     } satisfies LiveTvItem;
   }));
@@ -77,6 +84,17 @@ function timeLabel(value?: string): string {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function dateTimeLabel(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function isAiring(program: LiveTvItem, now = Date.now()): boolean {
+  if (!program.StartDate || !program.EndDate) return false;
+  return new Date(program.StartDate).getTime() <= now && new Date(program.EndDate).getTime() > now;
+}
+
 function channelLogo(channel: LiveTvItem, context: ScreenContext): string {
   const source = context.demo ? demoGradient(channel) : imageUrl(channel, context.api, false, 'Primary', 240);
   return source
@@ -97,6 +115,12 @@ function renderChannels(data: LiveTvData, context: ScreenContext): string {
       ${program ? `<span class="channel-progress"><span style="width:${pct.toFixed(2)}%"></span></span>` : ''}
     </button>`;
   }).join('')}</div>`;
+}
+
+function timerBadge(program: LiveTvItem): string {
+  if (program.TimerId) return '<span class="guide-recording-badge" title="Enregistrement programmé">●</span>';
+  if (program.SeriesTimerId) return '<span class="guide-recording-badge series" title="Série programmée">●●</span>';
+  return '';
 }
 
 function renderGuide(data: LiveTvData, context: ScreenContext): string {
@@ -121,8 +145,8 @@ function renderGuide(data: LiveTvData, context: ScreenContext): string {
         const end = Math.min(max, new Date(program.EndDate ?? max).getTime());
         const left = ((start - min) / (max - min)) * 100;
         const width = Math.max(2, ((end - start) / (max - min)) * 100);
-        const live = start <= Date.now() && end > Date.now();
-        return `<button class="guide-program ${live ? 'airing' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%" data-focusable="true" data-focus-zone="live-guide" data-focus-row="guide:${attribute(channel.Id)}" data-focus-key="program:${attribute(program.Id)}" ${live ? `data-play-item="${attribute(channel.Id)}"` : ''} title="${attribute(program.Name)} — ${timeLabel(program.StartDate)} à ${timeLabel(program.EndDate)}"><strong>${escapeHtml(program.Name)}</strong><small>${timeLabel(program.StartDate)}–${timeLabel(program.EndDate)}</small></button>`;
+        const live = isAiring(program);
+        return `<button class="guide-program ${live ? 'airing' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%" data-focusable="true" data-focus-zone="live-guide" data-focus-row="guide:${attribute(channel.Id)}" data-focus-key="program:${attribute(program.Id)}" data-live-program="${attribute(program.Id)}" title="${attribute(program.Name)} — ${timeLabel(program.StartDate)} à ${timeLabel(program.EndDate)}"><strong>${escapeHtml(program.Name)}</strong><small>${timeLabel(program.StartDate)}–${timeLabel(program.EndDate)}</small>${timerBadge(program)}</button>`;
       }).join('')}</div>`;
     }).join('')}
   </div></div>`;
@@ -131,6 +155,70 @@ function renderGuide(data: LiveTvData, context: ScreenContext): string {
 function renderRecordings(data: LiveTvData, context: ScreenContext): string {
   if (!data.recordings.length) return '<div class="empty"><div><h2>Aucun enregistrement</h2><p>Les enregistrements créés par Jellyfin apparaîtront ici.</p></div></div>';
   return `<div class="media-grid">${data.recordings.map((item) => mediaCard(item, { api: context.api, demo: context.demo, showTitles: true, rowKey: 'live-recordings', landscape: true })).join('')}</div>`;
+}
+
+function openProgramDialog(program: LiveTvItem, channel: LiveTvItem | undefined, context: ScreenContext): void {
+  context.root.querySelector('.live-program-dialog')?.remove();
+  const dialog = document.createElement('div');
+  dialog.className = 'modal-backdrop live-program-dialog';
+  const live = isAiring(program);
+  const canManage = Boolean(context.api && !context.demo);
+  dialog.innerHTML = `<section class="panel modal-card" role="dialog" aria-modal="true" aria-labelledby="live-program-title">
+    <span class="eyebrow">${escapeHtml(channel?.Name ?? program.ChannelName ?? 'Télévision')}</span>
+    <h2 id="live-program-title">${escapeHtml(program.Name)}</h2>
+    <p class="live-program-time">${escapeHtml(dateTimeLabel(program.StartDate))} – ${escapeHtml(timeLabel(program.EndDate))}</p>
+    ${program.Overview ? `<p>${escapeHtml(program.Overview)}</p>` : ''}
+    <div class="live-program-actions">
+      ${live && channel ? `<button class="btn primary" data-live-watch="${attribute(channel.Id)}" data-focusable="true">▶ Regarder</button>` : ''}
+      ${program.TimerId ? `<button class="btn danger" data-cancel-timer="${attribute(program.TimerId)}" data-focusable="true">Annuler l’enregistrement</button>` : `<button class="btn" data-create-timer="${attribute(program.ProgramId ?? program.Id)}" ${canManage ? '' : 'disabled'} data-focusable="true">● Enregistrer</button>`}
+      ${program.SeriesTimerId ? `<button class="btn danger" data-cancel-series-timer="${attribute(program.SeriesTimerId)}" data-focusable="true">Annuler la série</button>` : program.IsSeries ? `<button class="btn" data-create-series-timer="${attribute(program.ProgramId ?? program.Id)}" ${canManage ? '' : 'disabled'} data-focusable="true">●● Enregistrer la série</button>` : ''}
+      <button class="btn" data-close-program data-focusable="true">Fermer</button>
+    </div>
+    ${context.demo ? '<small>Les enregistrements sont désactivés en mode démo.</small>' : ''}
+  </section>`;
+  context.root.append(dialog);
+  context.focus.invalidate();
+  dialog.querySelector<HTMLElement>('button:not([disabled])')?.focus();
+  const close = () => { dialog.remove(); context.focus.invalidate(); };
+  const mutate = async (action: () => Promise<void>, success: string) => {
+    try {
+      await action();
+      context.toast(success, 'success');
+      close();
+      context.rerender();
+    } catch (error) {
+      context.toast(error instanceof Error ? error.message : 'Opération DVR impossible.', 'error');
+    }
+  };
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog || (event.target as Element).closest('[data-close-program]')) close();
+  }, { signal: context.signal });
+  dialog.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' || event.key === 'Backspace') { event.preventDefault(); close(); }
+  }, { signal: context.signal });
+  dialog.querySelector<HTMLButtonElement>('[data-live-watch]')?.addEventListener('click', async (event) => {
+    const channelId = (event.currentTarget as HTMLButtonElement).dataset.liveWatch;
+    if (!channelId) return;
+    close();
+    const item = context.items.get(channelId);
+    if (item) await context.play(item);
+  }, { signal: context.signal });
+  dialog.querySelector<HTMLButtonElement>('[data-create-timer]')?.addEventListener('click', (event) => {
+    const programId = (event.currentTarget as HTMLButtonElement).dataset.createTimer;
+    if (programId && context.api) void mutate(() => createTimer(context.api!, programId, context.signal), 'Enregistrement programmé.');
+  }, { signal: context.signal });
+  dialog.querySelector<HTMLButtonElement>('[data-cancel-timer]')?.addEventListener('click', (event) => {
+    const timerId = (event.currentTarget as HTMLButtonElement).dataset.cancelTimer;
+    if (timerId && context.api) void mutate(() => cancelTimer(context.api!, timerId, context.signal), 'Enregistrement annulé.');
+  }, { signal: context.signal });
+  dialog.querySelector<HTMLButtonElement>('[data-create-series-timer]')?.addEventListener('click', (event) => {
+    const programId = (event.currentTarget as HTMLButtonElement).dataset.createSeriesTimer;
+    if (programId && context.api) void mutate(() => createSeriesTimer(context.api!, programId, context.signal), 'Série programmée.');
+  }, { signal: context.signal });
+  dialog.querySelector<HTMLButtonElement>('[data-cancel-series-timer]')?.addEventListener('click', (event) => {
+    const timerId = (event.currentTarget as HTMLButtonElement).dataset.cancelSeriesTimer;
+    if (timerId && context.api) void mutate(() => cancelSeriesTimer(context.api!, timerId, context.signal), 'Programmation de série annulée.');
+  }, { signal: context.signal });
 }
 
 export async function renderLiveTv(context: ScreenContext, _route: Extract<Route, { name: 'library' }>): Promise<ScreenResult> {
@@ -149,7 +237,7 @@ export async function renderLiveTv(context: ScreenContext, _route: Extract<Route
     const now = new Date();
     const [programResult, recordingResult] = await Promise.all([
       channels.length ? context.api.request<QueryResult<LiveTvItem>>('/LiveTv/Programs', {
-        params: { UserId: userId, ChannelIds: channels.map((channel) => channel.Id).join(','), MinStartDate: new Date(now.getTime() - HOUR).toISOString(), MaxEndDate: new Date(now.getTime() + 7 * HOUR).toISOString(), Limit: Math.max(500, channels.length * 24), EnableImages: true, ImageTypeLimit: 1, Fields: 'Overview,ChannelInfo,PrimaryImageAspectRatio,Genres', SortBy: 'StartDate', SortOrder: 'Ascending' },
+        params: { UserId: userId, ChannelIds: channels.map((channel) => channel.Id).join(','), MinStartDate: new Date(now.getTime() - HOUR).toISOString(), MaxEndDate: new Date(now.getTime() + 7 * HOUR).toISOString(), Limit: Math.max(500, channels.length * 24), EnableImages: true, ImageTypeLimit: 1, Fields: 'Overview,ChannelInfo,PrimaryImageAspectRatio,Genres', EnableUserData: true, SortBy: 'StartDate', SortOrder: 'Ascending' },
         signal: context.signal,
       }).catch(() => ({ Items: [] })) : Promise.resolve({ Items: [] as LiveTvItem[] }),
       context.api.request<QueryResult<LiveTvItem>>('/LiveTv/Recordings', {
@@ -190,7 +278,12 @@ export async function renderLiveTv(context: ScreenContext, _route: Extract<Route
         context.root.querySelectorAll<HTMLElement>('[data-live-panel]').forEach((panel) => { panel.hidden = panel.dataset.livePanel !== key; });
         context.focus.invalidate();
         requestAnimationFrame(() => context.root.querySelector<HTMLElement>(`[data-live-panel="${key}"] [data-focusable="true"]`)?.focus());
-      }));
+      }, { signal: context.signal }));
+      context.root.querySelectorAll<HTMLButtonElement>('[data-live-program]').forEach((button) => button.addEventListener('click', () => {
+        const program = data.programs.find((candidate) => candidate.Id === button.dataset.liveProgram);
+        const channel = program ? data.channels.find((candidate) => candidate.Id === program.ChannelId) : undefined;
+        if (program) openProgramDialog(program, channel, context);
+      }, { signal: context.signal }));
     },
   };
 }
