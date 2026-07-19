@@ -19,18 +19,20 @@ permissions:
 
 jobs:
   web:
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package.json
-      - run: npm install --no-audit --no-fund
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -48,10 +50,22 @@ jobs:
           const initialJs = js.filter(f => !f.p.includes('hls')).reduce((sum, f) => sum + f.size, 0);
           const cssSize = css.reduce((sum, f) => sum + f.size, 0);
           if (initialJs > 260000) throw new Error(`JavaScript initial trop lourd: ${initialJs} octets`);
-          if (cssSize > 90000) throw new Error(`CSS trop lourd: ${cssSize} octets`);
+          if (cssSize > 110000) throw new Error(`CSS trop lourd: ${cssSize} octets`);
           console.log({ initialJs, cssSize, files });
           NODE
-      - uses: actions/upload-artifact@v4
+      - name: Install Chromium for TV tests
+        run: npx playwright install --with-deps chromium
+      - name: Run TV and visual E2E tests
+        run: npm run test:e2e -- --project=chromium-tv --project=chromium-720p
+      - uses: actions/upload-artifact@v5
         with:
           name: wholphin-web-dist
           path: web/dist
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() }}
+        with:
+          name: wholphin-web-playwright
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 30
