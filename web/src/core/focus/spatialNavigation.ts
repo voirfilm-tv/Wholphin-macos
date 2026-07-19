@@ -62,6 +62,7 @@ export class SpatialNavigation {
   private pressTarget: HTMLElement | null = null;
   private routeKey = 'global';
   private readonly restoredFocus = new Map<string, string>();
+  private restoreFrame = 0;
 
   constructor(options: SpatialNavigationOptions = {}) {
     this.root = options.root ?? document.body;
@@ -85,6 +86,7 @@ export class SpatialNavigation {
     document.removeEventListener('keydown', this.onKeyDown, true);
     document.removeEventListener('keyup', this.onKeyUp, true);
     window.removeEventListener('resize', this.invalidate);
+    cancelAnimationFrame(this.restoreFrame);
     this.cancelLongPress();
   }
 
@@ -119,6 +121,11 @@ export class SpatialNavigation {
 
   invalidate = (): void => {
     this.dirty = true;
+    cancelAnimationFrame(this.restoreFrame);
+    this.restoreFrame = requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || !(active instanceof HTMLElement) || !active.isConnected) this.restoreRouteFocus();
+    });
   };
 
   private refresh(): void {
