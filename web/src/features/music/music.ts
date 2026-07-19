@@ -5,6 +5,14 @@ import { formatRuntime } from '../../core/time';
 import { demoItems } from '../../demo/catalog';
 import type { JellyfinItem } from '../../types/jellyfin';
 import { imageUrl, mediaCard } from '../../ui/media';
+import { AudioPlayer } from '../../core/audio/audioPlayer';
+
+let persistentPlayer: AudioPlayer | null = null;
+
+function player(context: ScreenContext): AudioPlayer {
+  persistentPlayer ??= new AudioPlayer((message, tone) => context.toast(message, tone));
+  return persistentPlayer;
+}
 
 interface MusicData {
   artists: JellyfinItem[];
@@ -84,11 +92,11 @@ export async function renderMusic(context: ScreenContext, route: Extract<Route, 
         requestAnimationFrame(() => context.root.querySelector<HTMLElement>(`[data-music-panel="${key}"] [data-focusable="true"]`)?.focus());
       }));
       context.root.querySelectorAll<HTMLButtonElement>('[data-music-index]').forEach((button) => button.addEventListener('click', () => {
-        void context.playAudioQueue(data.tracks, Number(button.dataset.musicIndex));
+        void player(context).playQueue(data.tracks, Number(button.dataset.musicIndex), context.api, context.demo);
       }));
       context.root.querySelector<HTMLButtonElement>('[data-music-shuffle]')?.addEventListener('click', () => {
         const shuffled = [...data.tracks].sort(() => Math.random() - .5);
-        void context.playAudioQueue(shuffled, 0);
+        void player(context).playQueue(shuffled, 0, context.api, context.demo);
       });
     },
   };
