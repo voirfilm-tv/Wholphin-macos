@@ -1,4 +1,4 @@
-import { JellyfinApiError, normalizeServerUrl } from './client';
+import { JellyfinApiError, normalizeServerUrl } from './client.js';
 
 export type ConnectionIssueKind =
   | 'mixed-content'
