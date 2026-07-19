@@ -25,4 +25,6 @@
 .guide-program.airing { background: color-mix(in srgb, var(--accent) 32%, rgba(255,255,255,.07)); }
 .guide-program strong, .guide-program small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guide-program small { color: var(--muted); }
-@media (max-width: 760px) { .live-channel { grid-template-columns: 84px 1fr; } .channel-logo { width: 80px; height: 48px; } .channel-number, .channel-live-action { display: none; } }
+.guide-recording-badge{position:absolute;right:5px;top:5px;display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:rgba(10,10,15,.84);color:#ff4057;font-size:.74rem;line-height:1}.guide-recording-badge.series{letter-spacing:-3px;padding-right:7px}
+.live-program-dialog{z-index:1200}.live-program-dialog .modal-card{width:min(680px,calc(100vw - 40px));display:grid;gap:12px;padding:28px;background:rgba(17,17,25,.98)}.live-program-dialog h2{margin:.15rem 0;font-size:clamp(1.6rem,3vw,2.4rem)}.live-program-time{color:var(--muted);font-weight:650}.live-program-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.live-program-actions .danger{color:#ff9aa8;border-color:rgba(255,100,120,.28)}
+@media (max-width: 760px) { .live-channel { grid-template-columns: 84px 1fr; } .channel-logo { width: 80px; height: 48px; } .channel-number, .channel-live-action { display: none; } .live-program-actions{flex-direction:column}.live-program-actions .btn{width:100%} }
