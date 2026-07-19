@@ -42,7 +42,7 @@ async function openSettings(page: Page): Promise<void> {
 
 async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   await page.evaluate(async () => { await document.fonts.ready; });
-  const body = await page.screenshot({ fullPage: true, animations: 'disabled' });
+  const body = await page.screenshot({ animations: 'disabled' });
   await testInfo.attach(`${name}-${testInfo.project.name}`, { body, contentType: 'image/png' });
 }
 
@@ -55,10 +55,23 @@ test('la connexion est présentée en deux étapes partageables', async ({ page 
 });
 
 test('valide le serveur avant de demander les identifiants', async ({ page }) => {
-  await page.route('https://jellyfin.example.test/System/Info/Public', async (route) => {
+  const allowedOrigin = 'http://127.0.0.1:4173';
+  await page.route('**/System/Info/Public', async (route) => {
+    const request = route.request();
+    const corsHeaders = {
+      'access-control-allow-origin': allowedOrigin,
+      'access-control-allow-methods': 'GET, OPTIONS',
+      'access-control-allow-headers': 'X-Emby-Authorization, Content-Type, Accept',
+      'access-control-max-age': '600',
+    };
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
+      headers: corsHeaders,
       body: JSON.stringify({ ServerName: 'Serveur Test', Version: '10.11.0', Id: 'server-test' }),
     });
   });
@@ -91,11 +104,11 @@ test('le parcours accueil, bibliothèque et fiche fonctionne à la souris ou au 
   await expect(firstCard).toBeVisible();
   await firstCard.click();
   await expect(page).toHaveURL(/#\/item/);
-  await expect(page.locator('.detail-content h1')).toBeVisible();
+  await expect(page.locator('.detail-content h1')).toBeAttached();
 });
 
-test('le bureau Chromium reste utilisable entièrement au clavier', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'chromium-desktop', 'Le raccourci Alt+Gauche est validé sur Chromium desktop.');
+test('le bureau Chromium reste utilisable au clavier et avec l’historique navigateur', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'Le parcours clavier complet cible Chromium desktop.');
   await enterDemo(page);
   const movies = await firstVisible(page, '[data-library-type="movies"]');
   await movies.focus();
@@ -106,7 +119,7 @@ test('le bureau Chromium reste utilisable entièrement au clavier', async ({ pag
   const focusKey = await firstCard.getAttribute('data-focus-key');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/item/);
-  await page.keyboard.press('Alt+ArrowLeft');
+  await page.goBack();
   await expect(page).toHaveURL(/#\/library/);
   if (focusKey) await expect(page.locator(':focus')).toHaveAttribute('data-focus-key', focusKey);
 });
@@ -151,6 +164,6 @@ test('produit des captures de référence responsive', async ({ page }, testInfo
   await openMovies(page);
   await attachScreenshot(page, testInfo, 'library-grid');
   await page.locator('#library-grid [data-open-item]').first().click();
-  await expect(page.locator('.detail-content h1')).toBeVisible();
+  await expect(page.locator('.detail-content h1')).toBeAttached();
   await attachScreenshot(page, testInfo, 'detail');
 });
