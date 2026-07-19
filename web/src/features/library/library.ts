@@ -2,8 +2,9 @@ import type { ScreenContext, ScreenResult } from '../../core/context';
 import type { Route } from '../../core/router';
 import { escapeHtml, query } from '../../core/html';
 import { demoItems } from '../../demo/catalog';
-import type { JellyfinItem } from '../../types/jellyfin';
+import type { JellyfinItem, QueryResult } from '../../types/jellyfin';
 import { mediaCard } from '../../ui/media';
+import { VirtualGrid } from '../../ui/virtual/virtualGrid';
 
 function itemTypes(collectionType?: string): string | undefined {
   if (collectionType === 'movies') return 'Movie';
@@ -15,41 +16,108 @@ function itemTypes(collectionType?: string): string | undefined {
   return undefined;
 }
 
+function sortRequest(value: string): { sortBy: string; sortOrder: string } {
+  if (value === 'year-desc') return { sortBy: 'ProductionYear,SortName', sortOrder: 'Descending' };
+  if (value === 'rating-desc') return { sortBy: 'CommunityRating,SortName', sortOrder: 'Descending' };
+  if (value === 'date-desc') return { sortBy: 'DateCreated,SortName', sortOrder: 'Descending' };
+  return { sortBy: 'SortName', sortOrder: 'Ascending' };
+}
+
 export async function renderLibrary(context: ScreenContext, route: Extract<Route, { name: 'library' }>): Promise<ScreenResult> {
   const preferences = context.store.preferences();
-  let items: JellyfinItem[];
-  if (context.demo) {
-    items = route.collectionType === 'tvshows'
-      ? demoItems.filter((item) => item.Type === 'Series')
-      : demoItems.filter((item) => item.Type === 'Movie');
-  } else {
+  const pageSize = 60;
+  const fetchPage = async (startIndex: number, searchTerm = '', sort = 'name', signal = context.signal): Promise<QueryResult<JellyfinItem>> => {
+    if (context.demo) {
+      const type = route.collectionType === 'tvshows' ? 'Series' : 'Movie';
+      let filtered = demoItems.filter((item) => item.Type === type && item.Name.toLocaleLowerCase().includes(searchTerm.toLocaleLowerCase()));
+      const request = sortRequest(sort);
+      filtered = [...filtered].sort((a, b) => {
+        if (request.sortBy.startsWith('ProductionYear')) return (b.ProductionYear ?? 0) - (a.ProductionYear ?? 0);
+        if (request.sortBy.startsWith('CommunityRating')) return (b.CommunityRating ?? 0) - (a.CommunityRating ?? 0);
+        return a.Name.localeCompare(b.Name);
+      });
+      return { Items: filtered.slice(startIndex, startIndex + pageSize), TotalRecordCount: filtered.length, StartIndex: startIndex };
+    }
     if (!context.api) throw new Error('Client Jellyfin indisponible.');
-    items = (await context.api.items({ parentId: route.parentId, includeItemTypes: itemTypes(route.collectionType), limit: 200, signal: context.signal })).Items;
-  }
-  for (const item of items) context.items.set(item.Id, item);
-  if (items[0]) context.setBackdrop(items[0]);
-  const renderGrid = (list: JellyfinItem[]) => list.map((item) => mediaCard(item, { api: context.api, demo: context.demo, showTitles: preferences.showTitles, rowKey: `library:${route.parentId}` })).join('');
+    const request = sortRequest(sort);
+    return context.api.items({
+      parentId: route.parentId,
+      includeItemTypes: itemTypes(route.collectionType),
+      searchTerm: searchTerm || undefined,
+      limit: pageSize,
+      startIndex,
+      sortBy: request.sortBy,
+      sortOrder: request.sortOrder,
+      signal,
+    });
+  };
+
+  const initial = await fetchPage(0);
+  for (const item of initial.Items) context.items.set(item.Id, item);
+  if (initial.Items[0]) context.setBackdrop(initial.Items[0]);
+
   return {
     title: route.title,
     html: `<div class="toolbar">
-      <input class="input" id="library-filter" placeholder="Filtrer…" aria-label="Filtrer la bibliothèque" data-focusable="true" data-focus-key="library:filter">
-      <select id="library-sort" aria-label="Trier" data-focusable="true" data-focus-key="library:sort"><option value="name">Titre</option><option value="year-desc">Année décroissante</option><option value="rating-desc">Note décroissante</option></select>
-    </div><div class="media-grid" id="library-grid">${renderGrid(items)}</div>`,
+      <input class="input" id="library-filter" placeholder="Filtrer toute la bibliothèque…" aria-label="Filtrer la bibliothèque" data-focusable="true" data-focus-key="library:filter">
+      <select id="library-sort" aria-label="Trier" data-focusable="true" data-focus-key="library:sort"><option value="name">Titre</option><option value="date-desc">Ajout récent</option><option value="year-desc">Année décroissante</option><option value="rating-desc">Note décroissante</option></select>
+      <span class="result-count" id="library-count">${initial.TotalRecordCount ?? initial.Items.length} éléments</span>
+    </div><div id="library-grid" aria-live="polite"></div>`,
     afterRender: () => {
       const filter = query<HTMLInputElement>(context.root, '#library-filter');
       const sort = query<HTMLSelectElement>(context.root, '#library-sort');
-      const grid = query<HTMLElement>(context.root, '#library-grid');
-      const update = () => {
-        const term = filter.value.trim().toLocaleLowerCase();
-        const filtered = items.filter((item) => item.Name.toLocaleLowerCase().includes(term));
-        if (sort.value === 'year-desc') filtered.sort((a, b) => (b.ProductionYear ?? 0) - (a.ProductionYear ?? 0));
-        else if (sort.value === 'rating-desc') filtered.sort((a, b) => (b.CommunityRating ?? 0) - (a.CommunityRating ?? 0));
-        else filtered.sort((a, b) => a.Name.localeCompare(b.Name));
-        grid.innerHTML = filtered.length ? renderGrid(filtered) : `<div class="empty"><p>Aucun résultat pour « ${escapeHtml(filter.value)} ».</p></div>`;
-        context.focus.invalidate();
+      const container = query<HTMLElement>(context.root, '#library-grid');
+      const count = query<HTMLElement>(context.root, '#library-count');
+      let loaded = [...initial.Items];
+      let total = initial.TotalRecordCount ?? loaded.length;
+      let queryController: AbortController | null = null;
+      let debounce = 0;
+
+      const renderItem = (item: JellyfinItem) => mediaCard(item, { api: context.api, demo: context.demo, showTitles: preferences.showTitles, rowKey: `library:${route.parentId}` });
+      const grid = new VirtualGrid<JellyfinItem>({
+        container,
+        items: loaded,
+        totalCount: total,
+        renderItem,
+        itemKey: (item) => item.Id,
+        signal: context.signal,
+        onRendered: () => context.focus.invalidate(),
+        loadMore: async () => {
+          const page = await fetchPage(loaded.length, filter.value.trim(), sort.value, context.signal);
+          loaded = [...loaded, ...page.Items];
+          total = page.TotalRecordCount ?? total;
+          for (const item of page.Items) context.items.set(item.Id, item);
+          count.textContent = `${total} éléments`;
+          return { items: page.Items, totalCount: total };
+        },
+      });
+
+      const reload = async () => {
+        queryController?.abort();
+        queryController = new AbortController();
+        const signal = AbortSignal.any([context.signal, queryController.signal]);
+        count.textContent = 'Chargement…';
+        try {
+          const page = await fetchPage(0, filter.value.trim(), sort.value, signal);
+          if (signal.aborted) return;
+          loaded = [...page.Items];
+          total = page.TotalRecordCount ?? loaded.length;
+          context.items.clear();
+          for (const item of loaded) context.items.set(item.Id, item);
+          count.textContent = `${total} éléments`;
+          if (!loaded.length) container.innerHTML = `<div class="empty"><p>Aucun résultat pour « ${escapeHtml(filter.value)} ».</p></div>`;
+          grid.setItems(loaded, total);
+          context.focus.invalidate();
+        } catch (error) {
+          if (signal.aborted) return;
+          container.innerHTML = `<div class="empty"><p>${escapeHtml(error instanceof Error ? error.message : 'Chargement impossible.')}</p></div>`;
+        }
       };
-      filter.addEventListener('input', update);
-      sort.addEventListener('change', update);
+      filter.addEventListener('input', () => {
+        window.clearTimeout(debounce);
+        debounce = window.setTimeout(() => void reload(), 280);
+      });
+      sort.addEventListener('change', () => void reload());
     },
   };
 }
