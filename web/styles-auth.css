@@ -1,0 +1,5 @@
+.saved-session-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.saved-session-row .saved-session { min-width: 0; }
+.quick-connect-card { display: grid; place-items: center; gap: 14px; margin-top: 20px; padding: 20px; border-radius: 18px; background: rgba(255,255,255,.06); text-align: center; }
+.quick-connect-card .loader { width: 36px; height: 36px; }
+.quick-code { font-size: clamp(2.4rem, 9vw, 4.8rem); letter-spacing: .18em; font-variant-numeric: tabular-nums; color: #ddd6fe; }
