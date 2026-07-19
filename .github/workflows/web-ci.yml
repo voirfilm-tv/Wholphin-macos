@@ -56,7 +56,14 @@ jobs:
           cat lint.log
           exit $status
       - run: npm test
-      - run: npm run build
+      - name: Production build
+        shell: bash
+        run: |
+          set +e
+          npm run build > build.log 2>&1
+          status=$?
+          cat build.log
+          exit $status
       - name: Enforce initial asset budgets
         run: |
           node - <<'NODE'
@@ -89,6 +96,7 @@ jobs:
             web/npm-install.log
             web/typecheck.log
             web/lint.log
+            web/build.log
             web/playwright-report
             web/test-results
           if-no-files-found: ignore
