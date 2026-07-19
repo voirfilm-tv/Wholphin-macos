@@ -20,8 +20,17 @@ function isLoopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
 }
 
+export function normalizeEnteredServerUrl(input: unknown): string {
+  const normalized = normalizeServerUrl(input);
+  const url = new URL(normalized);
+  url.pathname = url.pathname
+    .replace(/\/web(?:\/index\.html)?\/?$/i, '')
+    .replace(/\/+$/, '');
+  return url.toString().replace(/\/$/, '');
+}
+
 export function assertBrowserCanReachServer(input: unknown, pageProtocol = globalThis.location?.protocol ?? 'https:'): string {
-  const serverUrl = normalizeServerUrl(input);
+  const serverUrl = normalizeEnteredServerUrl(input);
   const target = new URL(serverUrl);
   if (pageProtocol === 'https:' && target.protocol === 'http:' && !isLoopback(target.hostname)) {
     throw new Error('Cette interface est ouverte en HTTPS, mais le serveur Jellyfin utilise HTTP. Les navigateurs bloquent cette connexion. Utilise une adresse Jellyfin en HTTPS ou héberge aussi le client web en HTTP sur ton réseau local.');
