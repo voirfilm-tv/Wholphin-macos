@@ -23,6 +23,7 @@ async function openMovies(page: Page): Promise<void> {
   await movies.click();
   await expect(page).toHaveURL(/#\/library/);
   await expect(page.locator('#library-grid')).toBeVisible();
+  await expect(page.locator('#library-grid [data-open-item]').first()).toBeVisible();
 }
 
 async function openSettings(page: Page): Promise<void> {
@@ -101,7 +102,6 @@ test('le parcours accueil, bibliothèque et fiche fonctionne à la souris ou au 
   await enterDemo(page);
   await openMovies(page);
   const firstCard = page.locator('#library-grid [data-open-item]').first();
-  await expect(firstCard).toBeVisible();
   await firstCard.click();
   await expect(page).toHaveURL(/#\/item/);
   await expect(page.locator('.detail-content h1')).toBeAttached();
@@ -115,6 +115,7 @@ test('le bureau Chromium reste utilisable au clavier et avec l’historique navi
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/library/);
   const firstCard = page.locator('#library-grid [data-open-item]').first();
+  await expect(firstCard).toBeVisible();
   await firstCard.focus();
   const focusKey = await firstCard.getAttribute('data-focus-key');
   await page.keyboard.press('Enter');
@@ -164,6 +165,6 @@ test('produit des captures de référence responsive', async ({ page }, testInfo
   await openMovies(page);
   await attachScreenshot(page, testInfo, 'library-grid');
   await page.locator('#library-grid [data-open-item]').first().click();
-  await expect(page.locator('.detail-content h1')).toBeAttached();
+  await expect(page.locator('.wholphin-detail')).toBeVisible();
   await attachScreenshot(page, testInfo, 'detail');
 });
