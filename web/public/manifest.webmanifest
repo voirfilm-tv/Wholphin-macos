@@ -1,0 +1,11 @@
+{
+  "name": "Wholphin Web",
+  "short_name": "Wholphin",
+  "description": "Client web TV-first non officiel pour Jellyfin",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#09090d",
+  "theme_color": "#09090d",
+  "orientation": "any",
+  "icons": [{ "src": "./assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
