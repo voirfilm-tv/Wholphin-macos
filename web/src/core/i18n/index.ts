@@ -46,15 +46,39 @@ const dictionaries: Record<Locale, Dictionary> = {
 
 let locale: Locale = 'fr';
 
+function storedLocale(): Locale | null {
+  try {
+    const state = JSON.parse(localStorage.getItem('wholphin-web-state-v2') ?? 'null') as {
+      demo?: boolean;
+      activeSessionKey?: string | null;
+      preferencesByProfile?: Record<string, { language?: string }>;
+    } | null;
+    if (!state) return null;
+    const profileKey = state.demo ? 'demo' : state.activeSessionKey ?? 'anonymous';
+    return state.preferencesByProfile?.[profileKey]?.language === 'en' ? 'en' : 'fr';
+  } catch {
+    return null;
+  }
+}
+
+function syncLocale(): void {
+  const next = storedLocale();
+  if (next && next !== locale) setLocale(next);
+}
+
 export function setLocale(value: string | undefined): Locale {
   locale = value === 'en' ? 'en' : 'fr';
   document.documentElement.lang = locale;
   return locale;
 }
 
-export function getLocale(): Locale { return locale; }
+export function getLocale(): Locale {
+  syncLocale();
+  return locale;
+}
 
 export function t(key: TranslationKey, values: Record<string, string | number> = {}): string {
+  syncLocale();
   let text = dictionaries[locale][key] ?? dictionaries.fr[key];
   for (const [name, value] of Object.entries(values)) text = text.replaceAll(`{${name}}`, String(value));
   return text;
