@@ -9,8 +9,8 @@ export default defineConfig({
     reportCompressedSize: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          hls: ['hls.js']
+        manualChunks(id) {
+          return id.includes('/node_modules/hls.js/') ? 'hls' : undefined;
         }
       }
     }
