@@ -52,6 +52,13 @@ export interface JellyfinMediaStream {
   DeliveryUrl?: string;
   Title?: string;
   ChannelLayout?: string;
+  Channels?: number;
+  Width?: number;
+  Height?: number;
+  BitRate?: number;
+  SampleRate?: number;
+  VideoRange?: string;
+  VideoRangeType?: string;
 }
 
 export interface JellyfinChapter {
@@ -82,6 +89,7 @@ export interface JellyfinItem {
   Type: ItemType;
   CollectionType?: CollectionType;
   Overview?: string;
+  Taglines?: string[];
   ProductionYear?: number;
   RunTimeTicks?: number;
   CommunityRating?: number;
@@ -99,6 +107,7 @@ export interface JellyfinItem {
   Artists?: string[];
   AlbumPrimaryImageTag?: string;
   ChildCount?: number;
+  MediaSourceCount?: number;
   Genres?: string[];
   Studios?: Array<{ Name?: string; Id?: string }>;
   People?: Array<{ Name?: string; Id?: string; Type?: string; Role?: string; PrimaryImageTag?: string }>;
