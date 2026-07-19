@@ -32,7 +32,11 @@ export class App {
   private clockTimer = 0;
 
   constructor(private readonly root: HTMLElement) {
-    this.focus = new SpatialNavigation({ root: document.body, onBoundary: (direction, active) => this.onFocusBoundary(direction, active), onLongPress: (element) => this.openContextMenu(element) });
+    this.focus = new SpatialNavigation({
+      root: document.body,
+      onBoundary: (direction, active) => this.onFocusBoundary(direction, active),
+      onLongPress: (element) => this.openContextMenu(element),
+    });
   }
 
   start(): void {
@@ -61,7 +65,20 @@ export class App {
   }
 
   private createContext(signal: AbortSignal): ScreenContext {
-    return { root: this.root, store: this.store, router: this.router, focus: this.focus, api: this.api, signal, demo: this.store.snapshot().demo, items: this.items, setBackdrop: (item) => this.setBackdrop(item), toast: (message, tone) => this.toast(message, tone), play: (item) => this.play(item), rerender: () => void this.render(this.router.current()) };
+    return {
+      root: this.root,
+      store: this.store,
+      router: this.router,
+      focus: this.focus,
+      api: this.api,
+      signal,
+      demo: this.store.snapshot().demo,
+      items: this.items,
+      setBackdrop: (item) => this.setBackdrop(item),
+      toast: (message, tone) => this.toast(message, tone),
+      play: (item) => this.play(item),
+      rerender: () => void this.render(this.router.current()),
+    };
   }
 
   private async render(route: Route): Promise<void> {
@@ -82,14 +99,32 @@ export class App {
 
     let views: JellyfinItem[] = [];
     try { views = await this.getViews(signal); } catch { views = []; }
-    this.root.innerHTML = renderShell({ route, title: this.routeTitle(route), content: '<div class="empty"><div class="loader"></div></div>', session: this.store.activeSession(), demo: state.demo, views, drawerExpanded: this.drawerExpanded, showClock: this.store.preferences().showClock });
+    this.root.innerHTML = renderShell({
+      route,
+      title: this.routeTitle(route),
+      content: '<div class="empty"><div class="loader"></div></div>',
+      session: this.store.activeSession(),
+      demo: state.demo,
+      views,
+      drawerExpanded: this.drawerExpanded,
+      showClock: this.store.preferences().showClock,
+    });
     this.updateClock();
 
     try {
       const context = this.createContext(signal);
       const result = await this.renderRoute(context, route);
       if (signal.aborted) return;
-      this.root.innerHTML = renderShell({ route, title: result.title ?? this.routeTitle(route), content: result.html, session: this.store.activeSession(), demo: state.demo, views, drawerExpanded: this.drawerExpanded, showClock: this.store.preferences().showClock });
+      this.root.innerHTML = renderShell({
+        route,
+        title: result.title ?? this.routeTitle(route),
+        content: result.html,
+        session: this.store.activeSession(),
+        demo: state.demo,
+        views,
+        drawerExpanded: this.drawerExpanded,
+        showClock: this.store.preferences().showClock,
+      });
       this.updateClock();
       await result.afterRender?.(this.createContext(signal));
       this.focus.invalidate();
@@ -97,7 +132,16 @@ export class App {
     } catch (error) {
       if (signal.aborted) return;
       const message = error instanceof Error ? error.message : 'Erreur inconnue.';
-      this.root.innerHTML = renderShell({ route, title: 'Erreur', content: `<div class="empty"><div><h2>Impossible d’afficher cette page</h2><p>${escapeHtml(message)}</p><button class="btn" data-focusable="true" data-focus-initial="true" data-route="home">Accueil</button></div></div>`, session: this.store.activeSession(), demo: state.demo, views, drawerExpanded: this.drawerExpanded, showClock: this.store.preferences().showClock });
+      this.root.innerHTML = renderShell({
+        route,
+        title: 'Erreur',
+        content: `<div class="empty"><div><h2>Impossible d’afficher cette page</h2><p>${escapeHtml(message)}</p><button class="btn" data-focusable="true" data-focus-initial="true" data-route="home">Accueil</button></div></div>`,
+        session: this.store.activeSession(),
+        demo: state.demo,
+        views,
+        drawerExpanded: this.drawerExpanded,
+        showClock: this.store.preferences().showClock,
+      });
       this.focus.invalidate();
       requestAnimationFrame(() => this.focus.focusInitial());
     }
@@ -120,24 +164,79 @@ export class App {
 
   private routeTitle(route: Route): string {
     if (route.name === 'library') return route.title;
-    return ({ home: 'Accueil', search: 'Recherche', favorites: 'Favoris', item: '', discover: 'Découvrir', discoverItem: '', settings: 'Paramètres', about: 'À propos', diagnostics: 'Diagnostics' } as Record<Route['name'], string>)[route.name];
+    return ({
+      home: 'Accueil',
+      search: 'Recherche',
+      favorites: 'Favoris',
+      item: '',
+      discover: 'Découvrir',
+      discoverItem: '',
+      settings: 'Paramètres',
+      about: 'À propos',
+      diagnostics: 'Diagnostics',
+    } as Record<Route['name'], string>)[route.name];
   }
 
   private async onClick(event: MouseEvent): Promise<void> {
     const target = (event.target as Element | null)?.closest<HTMLElement>('[data-route],[data-library-id],[data-open-item],[data-play-item],[data-toggle-favorite],[data-toggle-watched],[data-action],[data-activate-session]');
     if (!target) return;
-    if (target.dataset.route) { this.router.navigate({ name: target.dataset.route as Route['name'] } as Route); return; }
-    if (target.dataset.libraryId) { this.router.navigate({ name: 'library', parentId: target.dataset.libraryId, title: target.dataset.libraryTitle ?? 'Bibliothèque', collectionType: target.dataset.libraryType }); return; }
-    if (target.dataset.openItem) { this.router.navigate({ name: 'item', id: target.dataset.openItem }); return; }
-    if (target.dataset.playItem) { const item = await this.resolveItem(target.dataset.playItem); if (item) await this.play(item); return; }
-    if (target.dataset.toggleFavorite) { await this.toggleFavorite(target.dataset.toggleFavorite, target); return; }
-    if (target.dataset.toggleWatched) { await this.toggleWatched(target.dataset.toggleWatched, target); return; }
-    if (target.dataset.activateSession) { this.store.activateSession(target.dataset.activateSession); this.router.navigate({ name: 'home' }, true); return; }
+    if (target.dataset.route) {
+      this.router.navigate({ name: target.dataset.route as Route['name'] } as Route);
+      return;
+    }
+    if (target.dataset.libraryId) {
+      this.router.navigate({
+        name: 'library',
+        parentId: target.dataset.libraryId,
+        title: target.dataset.libraryTitle ?? 'Bibliothèque',
+        collectionType: target.dataset.libraryType,
+      });
+      return;
+    }
+    if (target.dataset.openItem) {
+      this.router.navigate({ name: 'item', id: target.dataset.openItem });
+      return;
+    }
+    if (target.dataset.playItem) {
+      const item = await this.resolveItem(target.dataset.playItem);
+      if (item) await this.play(item);
+      return;
+    }
+    if (target.dataset.toggleFavorite) {
+      await this.toggleFavorite(target.dataset.toggleFavorite, target);
+      return;
+    }
+    if (target.dataset.toggleWatched) {
+      await this.toggleWatched(target.dataset.toggleWatched, target);
+      return;
+    }
+    if (target.dataset.activateSession) {
+      this.store.activateSession(target.dataset.activateSession);
+      this.router.navigate({ name: 'home' }, true);
+      return;
+    }
     switch (target.dataset.action) {
-      case 'toggle-drawer': this.setDrawerExpanded(!this.drawerExpanded); break;
-      case 'toggle-more': { const more = this.root.querySelector<HTMLElement>('[data-nav-more]'); if (more) { more.hidden = !more.hidden; this.focus.invalidate(); } break; }
-      case 'logout': this.store.logout(); this.router.navigate({ name: 'home' }, true); break;
-      case 'copy-diagnostics': { const text = this.root.querySelector('#diagnostics-report')?.textContent ?? ''; await navigator.clipboard.writeText(text); this.toast('Rapport copié.', 'success'); break; }
+      case 'toggle-drawer':
+        this.setDrawerExpanded(!this.drawerExpanded);
+        break;
+      case 'toggle-more': {
+        const more = this.root.querySelector<HTMLElement>('[data-nav-more]');
+        if (more) {
+          more.hidden = !more.hidden;
+          this.focus.invalidate();
+        }
+        break;
+      }
+      case 'logout':
+        this.store.logout();
+        this.router.navigate({ name: 'home' }, true);
+        break;
+      case 'copy-diagnostics': {
+        const text = this.root.querySelector('#diagnostics-report')?.textContent ?? '';
+        await navigator.clipboard.writeText(text);
+        this.toast('Rapport copié.', 'success');
+        break;
+      }
     }
   }
 
@@ -146,9 +245,14 @@ export class App {
     if (!target) return;
     const key = target.dataset.preference;
     if (!key) return;
-    const value: unknown = target instanceof HTMLInputElement && target.type === 'checkbox' ? target.checked : ['seekSeconds', 'backdropDelayMs'].includes(key) ? Number(target.value) : target.value;
+    const value: unknown = target instanceof HTMLInputElement && target.type === 'checkbox'
+      ? target.checked
+      : ['seekSeconds', 'backdropDelayMs'].includes(key) ? Number(target.value) : target.value;
     this.store.updatePreferences({ [key]: value } as never);
-    if (target instanceof HTMLInputElement && target.type === 'range') { const output = target.parentElement?.querySelector('output'); if (output) output.textContent = `${target.value} ms`; }
+    if (target instanceof HTMLInputElement && target.type === 'range') {
+      const output = target.parentElement?.querySelector('output');
+      if (output) output.textContent = `${target.value} ms`;
+    }
     if (key === 'showClock') void this.render(this.router.current());
   }
 
@@ -160,8 +264,16 @@ export class App {
   }
 
   private onFocusBoundary(direction: Direction, active: HTMLElement | null): boolean {
-    if (direction === 'left' && active?.dataset.focusZone !== 'drawer') { this.setDrawerExpanded(true); requestAnimationFrame(() => this.root.querySelector<HTMLElement>('[data-focus-key="nav:home"]')?.focus()); return true; }
-    if (direction === 'right' && active?.dataset.focusZone === 'drawer') { this.setDrawerExpanded(false); requestAnimationFrame(() => this.root.querySelector<HTMLElement>('[data-focus-zone="content"], [data-focus-zone="hero"]')?.focus()); return true; }
+    if (direction === 'left' && active?.dataset.focusZone !== 'drawer') {
+      this.setDrawerExpanded(true);
+      requestAnimationFrame(() => this.root.querySelector<HTMLElement>('[data-focus-key="nav:home"]')?.focus());
+      return true;
+    }
+    if (direction === 'right' && active?.dataset.focusZone === 'drawer') {
+      this.setDrawerExpanded(false);
+      requestAnimationFrame(() => this.root.querySelector<HTMLElement>('[data-focus-zone="content"], [data-focus-zone="hero"]')?.focus());
+      return true;
+    }
     return false;
   }
 
@@ -182,8 +294,10 @@ export class App {
     menu.className = 'context-menu panel';
     menu.innerHTML = `<h2>${escapeHtml(item.Name)}</h2><button class="btn primary" data-play-item="${item.Id}">Lire</button><button class="btn" data-toggle-favorite="${item.Id}">${item.UserData?.IsFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}</button><button class="btn" data-open-item="${item.Id}">Détails</button><button class="btn" data-action="close-context">Fermer</button>`;
     this.root.append(menu);
-    menu.querySelectorAll<HTMLElement>('button').forEach((button) => button.dataset.focusable = 'true');
-    menu.addEventListener('click', (event) => { if ((event.target as Element).closest('[data-action="close-context"]')) menu.remove(); });
+    menu.querySelectorAll<HTMLElement>('button').forEach((button) => { button.dataset.focusable = 'true'; });
+    menu.addEventListener('click', (event) => {
+      if ((event.target as Element).closest('[data-action="close-context"]')) menu.remove();
+    });
     menu.querySelector<HTMLElement>('button')?.focus();
     this.focus.invalidate();
   }
@@ -203,8 +317,15 @@ export class App {
     const next = !item.UserData?.IsFavorite;
     item.UserData = { ...item.UserData, IsFavorite: next };
     button.textContent = next ? '♥ Retirer' : '♡ Favori';
-    try { if (this.store.snapshot().demo) this.store.toggleDemoFavorite(id); else await this.api?.markFavorite(id, next); this.toast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.', 'success'); }
-    catch (error) { item.UserData.IsFavorite = !next; button.textContent = !next ? '♥ Retirer' : '♡ Favori'; this.toast(error instanceof Error ? error.message : 'Action impossible.', 'error'); }
+    try {
+      if (this.store.snapshot().demo) this.store.toggleDemoFavorite(id);
+      else await this.api?.markFavorite(id, next);
+      this.toast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.', 'success');
+    } catch (error) {
+      item.UserData.IsFavorite = !next;
+      button.textContent = !next ? '♥ Retirer' : '♡ Favori';
+      this.toast(error instanceof Error ? error.message : 'Action impossible.', 'error');
+    }
   }
 
   private async toggleWatched(id: string, button: HTMLElement): Promise<void> {
@@ -213,11 +334,51 @@ export class App {
     const next = !item.UserData?.Played;
     item.UserData = { ...item.UserData, Played: next };
     button.textContent = next ? '↶ Non vu' : '✓ Vu';
-    try { if (!this.store.snapshot().demo) await this.api?.markPlayed(id, next); this.toast(next ? 'Marqué comme vu.' : 'Marqué comme non vu.', 'success'); }
-    catch (error) { item.UserData.Played = !next; button.textContent = !next ? '↶ Non vu' : '✓ Vu'; this.toast(error instanceof Error ? error.message : 'Action impossible.', 'error'); }
+    try {
+      if (!this.store.snapshot().demo) await this.api?.markPlayed(id, next);
+      this.toast(next ? 'Marqué comme vu.' : 'Marqué comme non vu.', 'success');
+    } catch (error) {
+      item.UserData.Played = !next;
+      button.textContent = !next ? '↶ Non vu' : '✓ Vu';
+      this.toast(error instanceof Error ? error.message : 'Action impossible.', 'error');
+    }
   }
 
-  private async play(item: JellyfinItem): Promise<void> { await openPlayer({ item, api: this.api, demo: this.store.snapshot().demo, seekSeconds: this.store.preferences().seekSeconds }); }
+  private async findNextEpisode(item: JellyfinItem): Promise<JellyfinItem | null> {
+    if (this.store.snapshot().demo || !this.api || item.Type !== 'Episode' || !item.SeriesId) return null;
+    const seasons = (await this.api.seasons(item.SeriesId)).Items
+      .filter((season) => season.Id)
+      .sort((left, right) => (left.IndexNumber ?? 0) - (right.IndexNumber ?? 0));
+    let seasonIndex = seasons.findIndex((season) => season.Id === item.SeasonId);
+    if (seasonIndex < 0 && item.ParentIndexNumber !== undefined) seasonIndex = seasons.findIndex((season) => season.IndexNumber === item.ParentIndexNumber);
+    if (seasonIndex < 0) return null;
+
+    for (let index = seasonIndex; index < seasons.length; index += 1) {
+      const season = seasons[index]!;
+      const episodes = (await this.api.episodes(item.SeriesId, season.Id)).Items
+        .sort((left, right) => (left.IndexNumber ?? 0) - (right.IndexNumber ?? 0));
+      if (index === seasonIndex) {
+        const currentIndex = episodes.findIndex((episode) => episode.Id === item.Id);
+        if (currentIndex >= 0 && episodes[currentIndex + 1]) return episodes[currentIndex + 1]!;
+      } else if (episodes[0]) {
+        return episodes[0];
+      }
+    }
+    return null;
+  }
+
+  private async play(item: JellyfinItem): Promise<void> {
+    let nextItem: JellyfinItem | null = null;
+    try { nextItem = await this.findNextEpisode(item); } catch { nextItem = null; }
+    await openPlayer({
+      item,
+      api: this.api,
+      demo: this.store.snapshot().demo,
+      seekSeconds: this.store.preferences().seekSeconds,
+      nextItem,
+      onPlayNext: (next) => this.play(next),
+    });
+  }
 
   private setBackdrop(item?: JellyfinItem | null): void {
     const version = ++this.backdropVersion;
@@ -227,23 +388,39 @@ export class App {
       const current = this.root.querySelector<HTMLElement>('.backdrop-current');
       const next = this.root.querySelector<HTMLElement>('.backdrop-next');
       if (!current || !next) return;
-      const source = item ? imageUrl(item, this.api, this.store.snapshot().demo, 'Backdrop', 1920) || imageUrl(item, this.api, this.store.snapshot().demo, 'Primary', 1280) : '';
+      const source = item
+        ? imageUrl(item, this.api, this.store.snapshot().demo, 'Backdrop', 1920) || imageUrl(item, this.api, this.store.snapshot().demo, 'Primary', 1280)
+        : '';
       next.style.backgroundImage = source ? `url("${source}")` : '';
       next.classList.add('visible');
-      window.setTimeout(() => { current.style.backgroundImage = next.style.backgroundImage; next.classList.remove('visible'); }, 320);
+      window.setTimeout(() => {
+        current.style.backgroundImage = next.style.backgroundImage;
+        next.classList.remove('visible');
+      }, 320);
     }, this.store.preferences().backdropDelayMs);
   }
 
   private updateClock(): void {
     window.clearInterval(this.clockTimer);
-    const update = () => { const element = this.root.querySelector<HTMLTimeElement>('[data-clock]'); if (!element) return; const now = new Date(); element.dateTime = now.toISOString(); element.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+    const update = () => {
+      const element = this.root.querySelector<HTMLTimeElement>('[data-clock]');
+      if (!element) return;
+      const now = new Date();
+      element.dateTime = now.toISOString();
+      element.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
     update();
     this.clockTimer = window.setInterval(update, 30_000);
   }
 
   private toast(message: string, tone: 'neutral' | 'success' | 'error' = 'neutral'): void {
     let region = document.querySelector<HTMLElement>('.toast-region');
-    if (!region) { region = document.createElement('div'); region.className = 'toast-region'; region.setAttribute('aria-live', 'polite'); document.body.append(region); }
+    if (!region) {
+      region = document.createElement('div');
+      region.className = 'toast-region';
+      region.setAttribute('aria-live', 'polite');
+      document.body.append(region);
+    }
     const toast = document.createElement('div');
     toast.className = `toast ${tone}`;
     toast.textContent = message;
