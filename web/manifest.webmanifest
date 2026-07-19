@@ -1,0 +1,13 @@
+{
+  "name": "Wholphin Web",
+  "short_name": "Wholphin",
+  "description": "Client web non officiel pour Jellyfin",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#09090d",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {"src": "./assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}
