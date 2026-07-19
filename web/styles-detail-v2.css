@@ -1,0 +1,4 @@
+.season-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 8px 4px 18px; }
+.series-browser { min-height: 260px; }
+.technical-info { margin-top: 34px; padding-bottom: 48px; }
+.technical-info h2 { margin-bottom: 14px; }
