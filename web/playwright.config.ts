@@ -19,8 +19,11 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'firefox-desktop', use: { ...devices['Desktop Firefox'], viewport: { width: 1440, height: 900 } } },
+    { name: 'webkit-desktop', use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 } } },
     { name: 'chromium-tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 820, height: 1180 }, hasTouch: true } },
     { name: 'chromium-mobile', use: { ...devices['Pixel 7'] } },
+    { name: 'webkit-mobile', use: { ...devices['iPhone 13'] } },
   ],
   webServer: {
     command: 'npm run dev -- --port 4173 --strictPort',
