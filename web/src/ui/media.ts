@@ -26,18 +26,36 @@ export function progressPercent(item: JellyfinItem): number {
   return Math.min(100, ((item.UserData?.PlaybackPositionTicks ?? 0) / item.RunTimeTicks) * 100);
 }
 
+function itemSubtitle(item: JellyfinItem): string {
+  return [item.SeriesName, item.ProductionYear, formatRuntime(item.RunTimeTicks)].filter(Boolean).join(' • ');
+}
+
 export function mediaCard(item: JellyfinItem, options: MediaRenderOptions): string {
   const { api, demo, showTitles, landscape = false, rowKey = 'grid', imageWidth = 640 } = options;
   const source = imageUrl(item, api, demo, landscape ? 'Backdrop' : 'Primary', imageWidth);
   const progress = progressPercent(item);
-  const subtitle = [item.ProductionYear, formatRuntime(item.RunTimeTicks)].filter(Boolean).join(' • ');
-  return `<button class="media-card" data-focusable="true" data-focus-zone="content" data-focus-row="${attribute(rowKey)}" data-focus-key="item:${attribute(item.Id)}" data-open-item="${attribute(item.Id)}" aria-label="${attribute(item.Name)}">
+  const subtitle = itemSubtitle(item);
+  return `<button class="media-card ${landscape ? 'media-card-landscape' : ''}" data-focusable="true" data-focus-zone="content" data-focus-row="${attribute(rowKey)}" data-focus-key="item:${attribute(item.Id)}" data-open-item="${attribute(item.Id)}" aria-label="${attribute(item.Name)}">
     <span class="poster ${landscape ? 'landscape' : ''}">
       ${source ? `<img src="${attribute(source)}" alt="" loading="lazy" decoding="async" width="${landscape ? 640 : 400}" height="${landscape ? 360 : 600}">` : `<span class="poster-placeholder">${escapeHtml(item.Name)}</span>`}
-      ${item.UserData?.Played ? '<span class="card-badge">✓ Vu</span>' : ''}
+      ${item.UserData?.Played ? '<span class="card-badge">✓</span>' : ''}
+      ${item.UserData?.IsFavorite ? '<span class="card-badge card-badge-favorite">♥</span>' : ''}
       ${progress > 0 && progress < 95 ? `<span class="card-progress"><span style="width:${progress.toFixed(2)}%"></span></span>` : ''}
     </span>
     ${showTitles ? `<span class="card-title">${escapeHtml(item.Name)}</span><span class="card-subtitle">${escapeHtml(subtitle)}</span>` : ''}
+  </button>`;
+}
+
+export function mediaListItem(item: JellyfinItem, options: Omit<MediaRenderOptions, 'showTitles' | 'landscape'>): string {
+  const { api, demo, rowKey = 'list', imageWidth = 240 } = options;
+  const source = imageUrl(item, api, demo, 'Primary', imageWidth) || imageUrl(item, api, demo, 'Backdrop', imageWidth);
+  const progress = progressPercent(item);
+  const subtitle = itemSubtitle(item);
+  const overview = item.Overview?.trim() ?? '';
+  return `<button class="media-list-item" data-focusable="true" data-focus-zone="content" data-focus-row="${attribute(rowKey)}" data-focus-key="item:${attribute(item.Id)}" data-open-item="${attribute(item.Id)}" aria-label="${attribute(item.Name)}">
+    <span class="media-list-image">${source ? `<img src="${attribute(source)}" alt="" loading="lazy" decoding="async" width="112" height="72">` : '<span aria-hidden="true">▶</span>'}${progress > 0 && progress < 95 ? `<span class="card-progress"><span style="width:${progress.toFixed(2)}%"></span></span>` : ''}</span>
+    <span class="media-list-copy"><strong>${escapeHtml(item.Name)}</strong><small>${escapeHtml(subtitle)}</small>${overview ? `<span>${escapeHtml(overview)}</span>` : ''}</span>
+    <span class="media-list-status" aria-hidden="true">${item.UserData?.IsFavorite ? '♥' : ''}${item.UserData?.Played ? ' ✓' : ''}</span>
   </button>`;
 }
 
