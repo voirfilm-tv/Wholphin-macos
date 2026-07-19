@@ -13,8 +13,8 @@ export interface MediaRenderOptions {
   imageWidth?: number;
 }
 
-export function imageUrl(item: JellyfinItem, api: JellyfinApi | null, demo: boolean, type: 'Primary' | 'Backdrop' = 'Primary', width = 640): string {
-  if (demo) return demoGradient(item, type === 'Backdrop');
+export function imageUrl(item: JellyfinItem, api: JellyfinApi | null, demo: boolean, type: 'Primary' | 'Backdrop' | 'Logo' = 'Primary', width = 640): string {
+  if (demo) return type === 'Logo' ? '' : demoGradient(item, type === 'Backdrop');
   if (!api) return '';
   const tag = type === 'Backdrop' ? item.BackdropImageTags?.[0] : item.ImageTags?.[type];
   if (!tag) return '';
