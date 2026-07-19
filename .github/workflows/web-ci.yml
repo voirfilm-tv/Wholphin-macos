@@ -87,10 +87,10 @@ jobs:
           if (cssSize > 125000) throw new Error(`CSS trop lourd: ${cssSize} octets`);
           console.log({ initialJs, cssSize, files });
           NODE
-      - name: Install Chromium for responsive tests
-        run: npx playwright install --with-deps chromium
-      - name: Run desktop tablet and mobile E2E tests
-        run: npm run test:e2e -- --project=chromium-desktop --project=chromium-tablet --project=chromium-mobile
+      - name: Install Chromium Firefox and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run responsive browser E2E tests
+        run: npm run test:e2e
       - uses: actions/upload-artifact@v5
         with:
           name: wholphin-web-dist
