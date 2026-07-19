@@ -161,7 +161,7 @@ export class SpatialNavigation {
         bestScore = score;
       }
     }
-    if (!best && this.options.onBoundary?.(direction, activeElement)) return;
+    if (!best && document.documentElement.dataset.directionalDrawer === 'true' && this.options.onBoundary?.(direction, activeElement)) return;
     if (!best) return;
     best.element.focus({ preventScroll: true });
     best.element.scrollIntoView({ behavior: document.documentElement.dataset.reducedMotion === 'true' ? 'auto' : 'smooth', block: 'nearest', inline: 'nearest' });
