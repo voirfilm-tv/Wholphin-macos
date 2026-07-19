@@ -1,36 +1,87 @@
 # Wholphin Web
 
-Client web/PWA non officiel pour Jellyfin, développé dans le dépôt dérivé de Wholphin. L’objectif est de transposer l’expérience « 10-foot UI » de Wholphin dans un navigateur, sans prétendre que le code Android/Kotlin peut être exécuté tel quel sur le web.
+Wholphin Web est un client Jellyfin autonome, responsive et auto-hébergeable. Une même installation peut être partagée avec plusieurs personnes : chacune saisit l’adresse de son propre serveur Jellyfin, puis se connecte avec ses identifiants ou Quick Connect.
 
-## État de la version 0.1
+L’interface reprend les couleurs, ratios, densités, rangées, backdrops et principes visuels du projet Wholphin d’origine, tout en remplaçant les comportements exclusivement Android TV par des interactions web adaptées à la souris, au clavier et au tactile.
 
-Fonctionnel :
+## Parcours utilisateur
 
-- connexion à un serveur Jellyfin avec `/System/Info/Public` et `/Users/AuthenticateByName` ;
-- session locale, mode démo sans serveur et diagnostics expurgés ;
-- accueil avec reprise de lecture, prochains épisodes et ajouts récents ;
-- bibliothèques films et séries, recherche, filtres et favoris ;
-- fiches média, saisons et épisodes ;
-- lecture directe HTML5, repli HLS Jellyfin et HLS.js chargé à la demande ;
-- remontée de lecture à Jellyfin (`Playing`, `Progress`, `Stopped`) ;
-- navigation à la souris, au tactile, au clavier et à la télécommande ;
-- PWA, service worker, Docker et Nginx.
+1. Ouvrir l’URL publique de Wholphin Web.
+2. Saisir l’adresse complète du serveur Jellyfin, avec le port ou le sous-chemin si nécessaire.
+3. Le client vérifie `/System/Info/Public` et affiche le nom ainsi que la version du serveur.
+4. Saisir l’utilisateur et le mot de passe, ou utiliser Quick Connect.
+5. Les profils, serveurs, préférences et jetons restent stockés localement dans ce navigateur.
 
-Encore à porter pour atteindre la parité fonctionnelle complète avec Wholphin Android : Live TV/DVR avancé, musique complète avec file persistante, photos/diaporama, Seerr, configuration libre des rangées d’accueil, sous-titres avancés, trickplay, chapitres, versions multiples, profils protégés par PIN et écrans de personnalisation exhaustifs.
+Aucune adresse Jellyfin, aucun compte et aucune configuration GNFLIX ne sont intégrés au build.
 
-## Lancement local
+## Navigateurs ciblés
 
-Aucune compilation ni dépendance n’est nécessaire.
+Les validations automatisées couvrent :
+
+- Chromium desktop, tablette et mobile ;
+- Firefox desktop ;
+- WebKit desktop et mobile ;
+- fenêtres de 320 px aux grands écrans ;
+- souris, clavier et tactile.
+
+WebKit constitue une validation du moteur utilisé par Safari. Une validation finale sur Safari macOS/iOS réel reste recommandée avant une publication stable.
+
+## Fonctionnalités principales
+
+- plusieurs serveurs et profils isolés ;
+- connexion mot de passe et Quick Connect ;
+- verrouillage local par PIN dérivé avec PBKDF2 ;
+- accueil configurable avec reprise, épisodes suivants, favoris et rangées par bibliothèque ;
+- films, séries, saisons, épisodes, collections, dossiers, musique et photos ;
+- recherche, tris, filtres, grille, liste, pagination et virtualisation ;
+- favoris, état vu/non vu et playlists modifiables ;
+- Direct Play lorsque le navigateur le permet, sinon HLS/transcodage Jellyfin ;
+- choix des versions, pistes audio, sous-titres et chapitres ;
+- recherche de sous-titres distants, styles WebVTT, segments à passer et épisode suivant ;
+- Live TV, guide, enregistrements et programmation DVR ;
+- lecteur audio persistant, photothèque, diaporama et intégration Seerr ;
+- PWA, Docker, Nginx, diagnostics expurgés et tests automatisés.
+
+## Développement local
+
+Prérequis : Node.js 22.13 ou plus récent.
 
 ```bash
 cd web
-npm test
-npm run serve
+npm install
+npm run dev
 ```
 
-Puis ouvrir `http://localhost:8080`.
+Vite affiche l’adresse locale, généralement `http://localhost:5173`.
 
-Ne pas ouvrir `index.html` directement en `file://` : les modules JavaScript et le service worker nécessitent un serveur HTTP.
+Vérification complète hors tests navigateur :
+
+```bash
+npm run check
+```
+
+Tests responsive Playwright :
+
+```bash
+npx playwright install chromium firefox webkit
+npm run test:e2e
+```
+
+## Build de production
+
+```bash
+cd web
+npm install
+npm run build
+```
+
+Les fichiers statiques sont générés dans `web/dist/`.
+
+Prévisualisation du build :
+
+```bash
+npm run preview
+```
 
 ## Docker
 
@@ -47,25 +98,53 @@ cp docker-compose.example.yml docker-compose.yml
 docker compose up -d --build
 ```
 
-## Jellyfin, HTTPS et CORS
+Le conteneur sert uniquement le client statique. Il n’embarque pas Jellyfin et ne relaie pas automatiquement les requêtes vers les serveurs des utilisateurs.
 
-Le navigateur applique CORS et interdit les contenus actifs HTTP depuis une page HTTPS. En production :
+## HTTPS, CORS et certificats
 
-1. servir Wholphin Web et Jellyfin en HTTPS ;
-2. autoriser l’origine du client web dans la configuration réseau de Jellyfin ;
-3. idéalement placer les deux services derrière le même reverse proxy et le même domaine ou des sous-domaines cohérents.
+Un navigateur impose des contraintes que les applications natives Jellyfin n’ont pas :
 
-Les jetons sont conservés dans `localStorage`. Ce choix rend le client simple à auto-héberger, mais un script injecté dans la même origine pourrait les lire. Utiliser une origine dédiée, une CSP stricte au niveau du reverse proxy et ne pas ajouter de scripts tiers non maîtrisés. HLS.js est actuellement chargé depuis jsDelivr uniquement lorsque le navigateur ne sait pas lire HLS nativement ; il devra être vendored localement pour un déploiement totalement autonome.
+- un client ouvert en HTTPS ne peut pas appeler un serveur Jellyfin distant en HTTP ;
+- Jellyfin doit autoriser l’origine du client web dans sa configuration CORS lorsqu’ils utilisent des domaines différents ;
+- un certificat HTTPS invalide est bloqué par le navigateur avant que Wholphin Web puisse intervenir ;
+- un serveur local en HTTP reste utilisable depuis une installation locale également servie en HTTP.
+
+Le formulaire de connexion détecte le contenu mixte et transforme les erreurs réseau/CORS en messages explicites.
+
+Pour une installation publique, utiliser par exemple :
+
+- `https://wholphin.example.fr` pour le client ;
+- `https://jellyfin.example.fr` pour Jellyfin ;
+- l’origine `https://wholphin.example.fr` ajoutée aux origines CORS autorisées du serveur Jellyfin.
+
+## Stockage et sécurité
+
+Les jetons Jellyfin sont conservés dans `localStorage` afin de permettre plusieurs profils persistants. Le stockage du navigateur n’est pas un coffre-fort : tout script exécuté sur la même origine pourrait lire ces données.
+
+Mesures appliquées :
+
+- Content Security Policy sans script tiers ;
+- politique `no-referrer` ;
+- diagnostics avec jetons et clés masqués ;
+- service worker limité aux fichiers statiques du client ;
+- aucune mise en cache des API, images ou médias authentifiés ;
+- HLS.js intégré au bundle et chargé à la demande ;
+- en-têtes de sécurité Nginx ;
+- aucune publicité, analytics ou ressource JavaScript externe.
+
+Utiliser une origine dédiée à Wholphin Web et ne pas y injecter d’autres applications ou scripts.
 
 ## Architecture
 
-- `js/api.js` : client Jellyfin typé par conventions, construction d’URL, authentification, bibliothèques, lecture et progression ;
-- `js/app.js` : routeur, rendu, navigation spatiale et actions utilisateur ;
-- `js/player.js` : lecteur plein écran ;
-- `js/store.js` : session et préférences locales ;
-- `js/demo.js` : catalogue fictif sans œuvres ou affiches tierces ;
-- `styles.css` : design TV sombre et responsive.
+- `src/core/api/` : client Jellyfin, Quick Connect et diagnostics de connexion ;
+- `src/core/storage/` : sessions et préférences versionnées par profil ;
+- `src/core/` : routeur, orchestration, historique, compatibilité navigateur et navigation clavier ;
+- `src/features/` : domaines fonctionnels indépendants ;
+- `src/ui/` : cartes, shell et virtualisation ;
+- `e2e/` : parcours Playwright desktop, tablette et mobile ;
+- `tests/` : tests unitaires Node ;
+- `docs/WEB_CLIENT_SCOPE_AND_SOURCE_ANALYSIS.md` : périmètre web et analyse des sources Wholphin.
 
 ## Licence
 
-Le dépôt d’origine Wholphin est sous GNU GPL v2. Cette version modifiée est distribuée sous les mêmes conditions. Voir le fichier `LICENSE` à la racine du dépôt et `ATTRIBUTION.md` dans ce dossier.
+Le dépôt d’origine Wholphin est distribué sous GNU GPL v2. Cette adaptation conserve la même licence et les notices d’attribution. Voir `LICENSE` à la racine et `ATTRIBUTION.md` dans ce dossier.
