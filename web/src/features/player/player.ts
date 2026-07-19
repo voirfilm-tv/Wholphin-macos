@@ -6,8 +6,8 @@ import type { JellyfinChapter, JellyfinItem, JellyfinMediaSource, JellyfinMediaS
 export interface PlayerOptions { item: JellyfinItem; api: JellyfinApi | null; demo: boolean; seekSeconds: number; onClose?: () => void; }
 interface PlayerChoice { label: string; selected?: boolean; disabled?: boolean; action: () => void | Promise<void>; }
 
-function streamLabel(stream: JellyfinMediaStream): string { return stream.DisplayTitle ?? stream.Title ?? [stream.Language, stream.Codec, stream.ChannelLayout].filter(Boolean).join(' • ') || `Piste ${stream.Index ?? '?'}`; }
-function sourceLabel(source: JellyfinMediaSource, index: number): string { const bitrate = source.Bitrate ? `${Math.round(source.Bitrate / 1_000_000)} Mb/s` : ''; return source.Name ?? [source.Container?.toUpperCase(), source.VideoType, bitrate].filter(Boolean).join(' • ') || `Version ${index + 1}`; }
+function streamLabel(stream: JellyfinMediaStream): string { return stream.DisplayTitle ?? stream.Title ?? ([stream.Language, stream.Codec, stream.ChannelLayout].filter(Boolean).join(' • ') || `Piste ${stream.Index ?? '?'}`); }
+function sourceLabel(source: JellyfinMediaSource, index: number): string { const bitrate = source.Bitrate ? `${Math.round(source.Bitrate / 1_000_000)} Mb/s` : ''; return source.Name ?? ([source.Container?.toUpperCase(), source.VideoType, bitrate].filter(Boolean).join(' • ') || `Version ${index + 1}`); }
 
 export async function openPlayer(options: PlayerOptions): Promise<void> {
   const { item, api, demo, seekSeconds, onClose } = options;
