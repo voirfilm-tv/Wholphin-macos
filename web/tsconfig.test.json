@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-dist",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/core/router.ts",
+    "src/core/time.ts",
+    "src/core/api/client.ts",
+    "src/core/storage/store.ts",
+    "src/types/**/*.ts"
+  ]
+}
