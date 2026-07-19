@@ -51,7 +51,7 @@ export function renderShell(options: ShellOptions): string {
     <div class="backdrop-layer backdrop-current" aria-hidden="true"></div><div class="backdrop-layer backdrop-next" aria-hidden="true"></div>
 
     <aside class="side-nav" aria-label="Navigation principale">
-      <div class="desktop-brand"><img src="./assets/icon.svg" alt=""><strong>Wholphin</strong></div>
+      <button class="desktop-brand" type="button" data-action="toggle-drawer" data-focusable="true" data-focus-zone="drawer" data-focus-row="drawer" data-focus-key="nav:toggle" aria-label="${drawerExpanded ? 'Réduire' : 'Développer'} le menu"><img src="./assets/icon.svg" alt=""><strong>Wholphin</strong></button>
       <button class="profile-nav" data-focusable="true" data-focus-zone="drawer" data-focus-row="drawer" data-focus-key="nav:profile" data-action="switch-profile"><span class="avatar">${escapeHtml(profileName.slice(0, 1).toUpperCase())}</span><span class="profile-copy"><strong>${escapeHtml(profileName)}</strong><small>${escapeHtml(serverName)}</small></span></button>
       <nav class="nav-items">
         ${navButton({ label: t('nav.search'), icon: '⌕', route: 'search', active: routeActive(route, 'search'), key: 'search' })}
