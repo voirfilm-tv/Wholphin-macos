@@ -6,10 +6,13 @@ on:
       - 'web/**'
       - '.github/workflows/web-ci.yml'
   push:
-    branches: [main]
+    branches:
+      - main
+      - agent/add-wholphin-web
     paths:
       - 'web/**'
       - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
