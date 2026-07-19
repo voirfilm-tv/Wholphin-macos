@@ -23,6 +23,9 @@ export class AudioPlayer {
     this.element.hidden = true;
     this.element.setAttribute('aria-label', 'Lecteur audio');
     document.body.append(this.element);
+    new MutationObserver(() => {
+      if (document.querySelector('.auth-page') && !this.element.hidden) void this.close();
+    }).observe(document.body, { childList: true, subtree: true });
     this.bindAudio();
     this.bindMediaKeys();
   }
