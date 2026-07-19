@@ -1,9 +1,9 @@
 import type { ScreenContext, ScreenResult } from '../../core/context';
-import { escapeHtml, query } from '../../core/html';
+import { attribute, escapeHtml, query } from '../../core/html';
 import { formatRuntime } from '../../core/time';
 import { demoItems } from '../../demo/catalog';
 import type { JellyfinItem, QueryResult } from '../../types/jellyfin';
-import { mediaRow } from '../../ui/media';
+import { imageUrl, mediaRow } from '../../ui/media';
 import { openAddToPlaylistDialog, renderPlaylistDetail } from '../playlists/playlists';
 import { openRemoteSubtitleDialog } from '../subtitles/remoteSubtitles';
 
@@ -48,6 +48,26 @@ async function similarFor(context: ScreenContext, item: JellyfinItem): Promise<J
   return result.Items;
 }
 
+function streamSummary(item: JellyfinItem): string[] {
+  const source = item.MediaSources?.[0];
+  if (!source) return item.MediaSourceCount && item.MediaSourceCount > 1 ? [`${item.MediaSourceCount} versions`] : [];
+  const video = source.MediaStreams?.find((stream) => stream.Type === 'Video');
+  const audio = source.MediaStreams?.find((stream) => stream.Type === 'Audio');
+  const result = [
+    video?.DisplayTitle ?? [video?.Height ? `${video.Height}p` : '', video?.Codec?.toUpperCase(), video?.VideoRangeType ?? video?.VideoRange].filter(Boolean).join(' '),
+    audio?.DisplayTitle ?? [audio?.Codec?.toUpperCase(), audio?.ChannelLayout].filter(Boolean).join(' '),
+    (item.MediaSourceCount ?? item.MediaSources?.length ?? 0) > 1 ? `${item.MediaSourceCount ?? item.MediaSources?.length} versions` : '',
+  ].filter((value): value is string => Boolean(value));
+  return [...new Set(result)];
+}
+
+function directorNames(item: JellyfinItem): string {
+  return (item.People ?? [])
+    .filter((person) => person.Type?.toLocaleLowerCase() === 'director' && person.Name)
+    .map((person) => person.Name!)
+    .join(', ');
+}
+
 function technicalInfo(item: JellyfinItem): string {
   const source = item.MediaSources?.[0];
   if (!source) return '';
@@ -55,9 +75,9 @@ function technicalInfo(item: JellyfinItem): string {
   const video = streams.find((stream) => stream.Type === 'Video');
   const audio = streams.find((stream) => stream.Type === 'Audio');
   const subtitles = streams.filter((stream) => stream.Type === 'Subtitle').length;
-  return `<div class="technical-info"><h2>Informations techniques</h2><div class="info-grid">
-    <div class="info-card"><small>Conteneur</small>${escapeHtml(source.Container ?? '—')}</div><div class="info-card"><small>Vidéo</small>${escapeHtml(video?.DisplayTitle ?? video?.Codec ?? '—')}</div><div class="info-card"><small>Audio</small>${escapeHtml(audio?.DisplayTitle ?? audio?.Codec ?? '—')}</div><div class="info-card"><small>Sous-titres</small>${subtitles}</div>
-  </div></div>`;
+  return `<section class="technical-info"><h2>Informations techniques</h2><div class="info-grid">
+    <div class="info-card"><small>Conteneur</small>${escapeHtml(source.Container?.toUpperCase() ?? '—')}</div><div class="info-card"><small>Vidéo</small>${escapeHtml(video?.DisplayTitle ?? video?.Codec?.toUpperCase() ?? '—')}</div><div class="info-card"><small>Audio</small>${escapeHtml(audio?.DisplayTitle ?? audio?.Codec?.toUpperCase() ?? '—')}</div><div class="info-card"><small>Sous-titres</small>${subtitles}</div>
+  </div></section>`;
 }
 
 export async function renderDetail(context: ScreenContext, id: string): Promise<ScreenResult> {
@@ -78,10 +98,17 @@ export async function renderDetail(context: ScreenContext, id: string): Promise<
   if (item.Type === 'Series') {
     const seasons = context.demo ? Array.from({ length: 3 }, (_, index) => ({ Id: `${item.Id}-season-${index + 1}`, Name: `Saison ${index + 1}`, Type: 'Season' } satisfies JellyfinItem)) : (await context.api!.seasons(item.Id, context.signal)).Items;
     initialSeasonId = seasons[0]?.Id ?? '';
-    seriesSection = `<section class="section series-browser"><div class="season-tabs" role="tablist">${seasons.map((season, index) => `<button class="chip ${index === 0 ? 'active' : ''}" role="tab" aria-selected="${index === 0}" data-season-id="${escapeHtml(season.Id)}" data-focusable="true" data-focus-zone="season-tabs" data-focus-row="season-tabs" data-focus-key="season:${escapeHtml(season.Id)}">${escapeHtml(season.Name)}</button>`).join('')}</div><div id="episode-list"><div class="empty"><div class="loader"></div></div></div></section>`;
+    seriesSection = `<section class="section series-browser"><div class="season-tabs" role="tablist">${seasons.map((season, index) => `<button class="chip ${index === 0 ? 'active' : ''}" role="tab" aria-selected="${index === 0}" data-season-id="${attribute(season.Id)}" data-focusable="true" data-focus-zone="season-tabs" data-focus-row="season-tabs" data-focus-key="season:${attribute(season.Id)}">${escapeHtml(season.Name)}</button>`).join('')}</div><div id="episode-list"><div class="empty"><div class="loader"></div></div></div></section>`;
   }
 
   const genres = item.Genres?.join(' • ') ?? '';
+  const directors = directorNames(item);
+  const streams = streamSummary(item);
+  const logo = imageUrl(item, context.api, context.demo, 'Logo', 900);
+  const tagline = item.Taglines?.find((value) => value.trim());
+  const overview = item.Overview?.trim() || 'Aucun résumé disponible.';
+  const overviewExpandable = overview.length > 260;
+  const quickDetails = [item.ProductionYear, formatRuntime(item.RunTimeTicks), item.OfficialRating, item.CommunityRating ? `★ ${item.CommunityRating.toFixed(1)}` : ''].filter(Boolean);
   const relatedSections = [
     people.length ? mediaRow('Distribution et équipe', `people:${item.Id}`, people, { api: context.api, demo: context.demo, showTitles: true }) : '',
     children.length ? mediaRow(item.Type === 'Person' ? 'Filmographie' : item.Type === 'MusicAlbum' ? 'Titres' : 'Contenu', `children:${item.Id}`, children, { api: context.api, demo: context.demo, showTitles: true }) : '',
@@ -90,18 +117,33 @@ export async function renderDetail(context: ScreenContext, id: string): Promise<
   ].join('');
   const canAddToPlaylist = !['Person', 'MusicArtist', 'Photo', 'PhotoAlbum', 'CollectionFolder', 'Folder', 'UserView'].includes(item.Type);
   const canSearchSubtitles = ['Movie', 'Episode', 'Video', 'MusicVideo'].includes(item.Type);
+  const playable = ['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio'].includes(item.Type);
 
   return {
-    html: `<section class="detail-layout"><div class="detail-content"><span class="eyebrow">${escapeHtml(item.Type)}</span><h1>${escapeHtml(item.Name)}</h1>
-      <div class="hero-meta"><span>${item.ProductionYear ?? ''}</span><span>${formatRuntime(item.RunTimeTicks)}</span><span>${escapeHtml(item.OfficialRating ?? '')}</span><span>${item.CommunityRating ? `★ ${item.CommunityRating.toFixed(1)}` : ''}</span></div>
-      <p class="detail-overview">${escapeHtml(item.Overview ?? 'Aucun résumé disponible.')}</p>${genres ? `<p class="detail-genres">${escapeHtml(genres)}</p>` : ''}
-      <div class="actions">${['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio'].includes(item.Type) ? `<button class="btn primary" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:play" data-play-item="${item.Id}">▶ Lire</button>` : ''}
-        <button class="btn" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:favorite" data-toggle-favorite="${item.Id}">${item.UserData?.IsFavorite ? '♥ Retirer' : '♡ Favori'}</button>
-        ${!['Person', 'MusicArtist'].includes(item.Type) ? `<button class="btn" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:watched" data-toggle-watched="${item.Id}">${item.UserData?.Played ? '↶ Non vu' : '✓ Vu'}</button>` : ''}
-        ${canAddToPlaylist ? `<button class="btn" data-add-to-playlist="${item.Id}" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:playlist">＋ Playlist</button>` : ''}
-        ${canSearchSubtitles ? `<button class="btn" data-search-subtitles="${item.Id}" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:subtitles">CC Sous-titres</button>` : ''}
-      </div></div></section>${seriesSection}${relatedSections}${technicalInfo(item)}`,
+    html: `<section class="detail-layout wholphin-detail"><div class="detail-content">
+      <span class="eyebrow">${escapeHtml(item.Type)}</span>
+      <div class="detail-title">${logo ? `<img class="detail-logo" src="${attribute(logo)}" alt="${attribute(item.Name)}">` : ''}<h1 class="${logo ? 'visually-hidden' : ''}">${escapeHtml(item.Name)}</h1></div>
+      ${quickDetails.length ? `<div class="hero-meta detail-quick-details">${quickDetails.map((detail) => `<span>${escapeHtml(String(detail))}</span>`).join('')}</div>` : ''}
+      ${genres ? `<p class="detail-genres">${escapeHtml(genres)}</p>` : ''}
+      ${streams.length ? `<div class="detail-streams">${streams.map((stream) => `<span>${escapeHtml(stream)}</span>`).join('')}</div>` : ''}
+      ${tagline ? `<p class="detail-tagline">${escapeHtml(tagline)}</p>` : ''}
+      <div class="detail-overview-wrap ${overviewExpandable ? 'is-collapsible' : ''}" data-overview-wrap><p class="detail-overview" data-overview>${escapeHtml(overview)}</p>${overviewExpandable ? '<button class="detail-overview-toggle" type="button" data-toggle-overview aria-expanded="false">Lire la suite</button>' : ''}</div>
+      ${directors ? `<p class="detail-director">Réalisé par <strong>${escapeHtml(directors)}</strong></p>` : ''}
+      <div class="actions detail-actions">${playable ? `<button class="btn primary" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:play" data-play-item="${attribute(item.Id)}">▶ Lire</button>` : ''}
+        <button class="btn" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:favorite" data-toggle-favorite="${attribute(item.Id)}">${item.UserData?.IsFavorite ? '♥ Retirer' : '♡ Favori'}</button>
+        ${!['Person', 'MusicArtist'].includes(item.Type) ? `<button class="btn" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:watched" data-toggle-watched="${attribute(item.Id)}">${item.UserData?.Played ? '↶ Non vu' : '✓ Vu'}</button>` : ''}
+        ${canAddToPlaylist ? `<button class="btn" data-add-to-playlist="${attribute(item.Id)}" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:playlist">＋ Playlist</button>` : ''}
+        ${canSearchSubtitles ? `<button class="btn" data-search-subtitles="${attribute(item.Id)}" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:subtitles">CC Sous-titres</button>` : ''}
+      </div>
+    </div></section>${seriesSection}${relatedSections}${technicalInfo(item)}`,
     afterRender: () => {
+      context.root.querySelector<HTMLButtonElement>('[data-toggle-overview]')?.addEventListener('click', (event) => {
+        const button = event.currentTarget as HTMLButtonElement;
+        const wrap = button.closest<HTMLElement>('[data-overview-wrap]');
+        const expanded = wrap?.classList.toggle('expanded') ?? false;
+        button.setAttribute('aria-expanded', String(expanded));
+        button.textContent = expanded ? 'Réduire' : 'Lire la suite';
+      }, { signal: context.signal });
       context.root.querySelector<HTMLButtonElement>('[data-add-to-playlist]')?.addEventListener('click', () => void openAddToPlaylistDialog(context, item).catch((error) => context.toast(error instanceof Error ? error.message : 'Playlists indisponibles.', 'error')), { signal: context.signal });
       context.root.querySelector<HTMLButtonElement>('[data-search-subtitles]')?.addEventListener('click', () => openRemoteSubtitleDialog(context, item), { signal: context.signal });
       if (item.Type !== 'Series') return;
