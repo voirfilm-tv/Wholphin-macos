@@ -7,4 +7,10 @@ export function installResponsiveShellBridge(root: HTMLElement): void {
     const logout = root.querySelector<HTMLElement>('[data-action="logout"]');
     if (logout && logout !== target) logout.click();
   }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+      event.stopImmediatePropagation();
+    }
+  }, true);
 }
