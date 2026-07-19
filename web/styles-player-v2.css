@@ -7,4 +7,9 @@
 .player-menu-list button:disabled { opacity: .55; cursor: default; }
 .player-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; color: #d4d4dc; font-size: .82rem; }
 .player-stats span { padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.08); }
-@media(max-width:760px){.player-menu{padding:14px}.player-actions{overflow-x:auto;flex-wrap:nowrap}.player-actions .btn{white-space:nowrap}}
+.player-skip-segment{position:absolute;right:max(4vw,28px);bottom:max(18vh,150px);z-index:24;min-height:52px;padding:0 22px;border-radius:999px;box-shadow:0 12px 35px rgba(0,0,0,.42)}
+.player-skip-segment[hidden]{display:none}
+.next-episode-overlay{position:absolute;inset:0;z-index:35;display:grid;place-items:center;padding:30px;background:linear-gradient(90deg,rgba(0,0,0,.86),rgba(0,0,0,.55))}
+.next-episode-overlay .panel{width:min(620px,100%);padding:28px;background:rgba(18,18,26,.97);box-shadow:0 25px 80px rgba(0,0,0,.6)}
+.next-episode-overlay h2{font-size:clamp(1.7rem,3vw,2.8rem);margin:.25rem 0 .7rem}.next-episode-overlay p{color:#d1d1da;font-size:1.05rem}.next-episode-overlay .actions{display:flex;gap:10px;margin-top:20px}
+@media(max-width:760px){.player-menu{padding:14px}.player-actions{overflow-x:auto;flex-wrap:nowrap}.player-actions .btn{white-space:nowrap}.player-skip-segment{right:16px;bottom:138px}.next-episode-overlay{padding:16px}.next-episode-overlay .actions{flex-direction:column}}
