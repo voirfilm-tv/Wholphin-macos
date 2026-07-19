@@ -55,7 +55,14 @@ jobs:
           status=$?
           cat lint.log
           exit $status
-      - run: npm test
+      - name: Unit tests
+        shell: bash
+        run: |
+          set +e
+          npm test > test.log 2>&1
+          status=$?
+          cat test.log
+          exit $status
       - name: Production build
         shell: bash
         run: |
@@ -96,6 +103,7 @@ jobs:
             web/npm-install.log
             web/typecheck.log
             web/lint.log
+            web/test.log
             web/build.log
             web/playwright-report
             web/test-results
