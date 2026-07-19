@@ -41,9 +41,15 @@ function validate(pin: string): void {
   if (!/^\d{4,8}$/.test(pin)) throw new Error('Le PIN doit contenir entre 4 et 8 chiffres.');
 }
 
+function ownedBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 async function derive(pin: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, material, 256);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: ownedBuffer(salt), iterations, hash: 'SHA-256' }, material, 256);
   return new Uint8Array(bits);
 }
 
