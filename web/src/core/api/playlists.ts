@@ -16,12 +16,15 @@ export interface PlaylistSummary {
 }
 
 export async function listPlaylists(api: JellyfinApi, signal?: AbortSignal): Promise<PlaylistSummary[]> {
-  const result = await api.items({
-    includeItemTypes: 'Playlist',
-    recursive: true,
-    sortBy: 'SortName',
-    sortOrder: 'Ascending',
-    limit: 1_000,
+  const result = await api.request<QueryResult<JellyfinItem>>(`/Users/${api.userId}/Items`, {
+    params: {
+      IncludeItemTypes: 'Playlist',
+      Recursive: true,
+      SortBy: 'SortName',
+      SortOrder: 'Ascending',
+      Limit: 1_000,
+      Fields: 'ChildCount',
+    },
     signal,
   });
   return result.Items.map((item) => ({ Id: item.Id, Name: item.Name, Type: 'Playlist', ChildCount: item.ChildCount }));
