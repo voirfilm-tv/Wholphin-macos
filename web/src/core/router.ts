@@ -4,6 +4,8 @@ export type Route =
   | { name: 'library'; parentId: string; title: string; collectionType?: string }
   | { name: 'favorites' }
   | { name: 'item'; id: string }
+  | { name: 'discover'; mediaType?: 'movie' | 'tv'; query?: string }
+  | { name: 'discoverItem'; mediaType: 'movie' | 'tv'; id: number }
   | { name: 'settings' }
   | { name: 'about' }
   | { name: 'diagnostics' };
@@ -19,6 +21,14 @@ export function serializeRoute(route: Route): string {
     case 'search':
       if (route.query) params.set('q', route.query);
       return `#/search${params.size ? `?${params}` : ''}`;
+    case 'discover':
+      if (route.mediaType) params.set('type', route.mediaType);
+      if (route.query) params.set('q', route.query);
+      return `#/discover${params.size ? `?${params}` : ''}`;
+    case 'discoverItem':
+      params.set('type', route.mediaType);
+      params.set('id', String(route.id));
+      return `#/discover/item?${params}`;
     case 'item':
       params.set('id', route.id);
       return `#/item?${params}`;
@@ -35,6 +45,15 @@ export function parseRoute(hash: string): Route {
   const [path = 'home', rawQuery = ''] = clean.split('?');
   const params = new URLSearchParams(rawQuery);
   if (path === 'search') return { name: 'search', query: params.get('q') ?? undefined };
+  if (path === 'discover') {
+    const type = params.get('type');
+    return { name: 'discover', mediaType: type === 'tv' ? 'tv' : type === 'movie' ? 'movie' : undefined, query: params.get('q') ?? undefined };
+  }
+  if (path === 'discover/item') {
+    const type = params.get('type');
+    const id = Number(params.get('id'));
+    return (type === 'movie' || type === 'tv') && Number.isFinite(id) ? { name: 'discoverItem', mediaType: type, id } : { name: 'discover' };
+  }
   if (path === 'favorites') return { name: 'favorites' };
   if (path === 'settings') return { name: 'settings' };
   if (path === 'about') return { name: 'about' };
@@ -53,33 +72,18 @@ export function parseRoute(hash: string): Route {
 }
 
 export class Router extends EventTarget {
-  current(): Route {
-    return parseRoute(location.hash);
-  }
-
+  current(): Route { return parseRoute(location.hash); }
   start(): void {
     window.addEventListener('hashchange', () => this.emit());
     if (!location.hash) history.replaceState(null, '', serializeRoute({ name: 'home' }));
     queueMicrotask(() => this.emit());
   }
-
   navigate(route: Route, replace = false): void {
     const target = serializeRoute(route);
-    if (replace) {
-      history.replaceState(null, '', target);
-      this.emit();
-    } else if (location.hash !== target) {
-      location.hash = target;
-    } else {
-      this.emit();
-    }
+    if (replace) { history.replaceState(null, '', target); this.emit(); }
+    else if (location.hash !== target) location.hash = target;
+    else this.emit();
   }
-
-  back(): void {
-    history.back();
-  }
-
-  private emit(): void {
-    this.dispatchEvent(new CustomEvent<Route>('route', { detail: this.current() }));
-  }
+  back(): void { history.back(); }
+  private emit(): void { this.dispatchEvent(new CustomEvent<Route>('route', { detail: this.current() })); }
 }
