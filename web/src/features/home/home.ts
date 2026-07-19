@@ -1,5 +1,6 @@
 import type { ScreenContext, ScreenResult } from '../../core/context';
-import { escapeHtml } from '../../core/html';
+import { attribute, escapeHtml } from '../../core/html';
+import { formatRuntime } from '../../core/time';
 import { demoRows, demoViews } from '../../demo/catalog';
 import type { JellyfinItem } from '../../types/jellyfin';
 import { mediaRow } from '../../ui/media';
@@ -12,6 +13,8 @@ interface HomeRowData {
   defaultLandscape?: boolean;
 }
 
+const PLAYABLE_TYPES = new Set(['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio', 'TvChannel', 'Recording']);
+
 function latestTypes(view: JellyfinItem): string | undefined {
   if (view.CollectionType === 'movies') return 'Movie';
   if (view.CollectionType === 'tvshows') return 'Series';
@@ -22,6 +25,11 @@ function latestTypes(view: JellyfinItem): string | undefined {
   if (view.CollectionType === 'musicvideos') return 'MusicVideo';
   if (view.CollectionType === 'homevideos') return 'Video';
   return undefined;
+}
+
+function itemMeta(item?: JellyfinItem): string {
+  if (!item) return '';
+  return [item.SeriesName, item.ProductionYear, formatRuntime(item.RunTimeTicks), item.OfficialRating].filter(Boolean).join(' • ');
 }
 
 export async function getHomeDefinitions(context: ScreenContext): Promise<HomeRowDefinition[]> {
@@ -76,13 +84,44 @@ export async function renderHome(context: ScreenContext): Promise<ScreenResult> 
 
   return {
     title: 'Accueil',
-    html: `<section class="hero"><div class="hero-content">
-      <span class="eyebrow">${context.demo ? 'Démonstration' : 'Jellyfin'}</span>
-      <h2>${escapeHtml(hero?.Name ?? 'Bienvenue')}</h2>
-      <p>${escapeHtml(hero?.Overview ?? 'Retrouve tes bibliothèques dans une interface conçue pour le grand écran.')}</p>
-      ${hero ? `<div class="actions"><button class="btn primary" data-focusable="true" data-focus-zone="hero" data-focus-key="hero:play" data-play-item="${hero.Id}">▶ Lire</button><button class="btn" data-focusable="true" data-focus-zone="hero" data-focus-key="hero:details" data-open-item="${hero.Id}">Détails</button><button class="btn" data-focusable="true" data-focus-zone="hero" data-focus-key="hero:customize" data-route="settings">Personnaliser</button></div>` : ''}
+    html: `<section class="hero home-hero" data-home-hero><div class="hero-content">
+      <span class="eyebrow" data-hero-eyebrow>${context.demo ? 'Démonstration' : 'Jellyfin'}</span>
+      <h2 data-hero-title>${escapeHtml(hero?.Name ?? 'Bienvenue')}</h2>
+      <div class="hero-meta" data-hero-meta ${itemMeta(hero) ? '' : 'hidden'}>${escapeHtml(itemMeta(hero))}</div>
+      <p data-hero-overview>${escapeHtml(hero?.Overview ?? 'Retrouve tes bibliothèques dans une interface web inspirée de Wholphin.')}</p>
+      <div class="actions" data-hero-actions ${hero ? '' : 'hidden'}><button class="btn primary" data-focusable="true" data-focus-zone="hero" data-focus-key="hero:play" data-hero-play data-play-item="${attribute(hero?.Id ?? '')}" ${hero && PLAYABLE_TYPES.has(hero.Type) ? '' : 'hidden'}>▶ Lire</button><button class="btn" data-focusable="true" data-focus-zone="hero" data-focus-key="hero:details" data-hero-details data-open-item="${attribute(hero?.Id ?? '')}">Détails</button><button class="btn" data-focusable="true" data-focus-zone="hero" data-focus-key="hero:customize" data-route="settings">Personnaliser</button></div>
     </div></section>
     ${visibleRows.map(({ row, preference }) => mediaRow(row.title, row.key, row.items, { api: context.api, demo: context.demo, showTitles: preference.showTitles && preferences.showTitles, landscape: preference.imageType === 'landscape' || row.defaultLandscape })).join('')}
     ${visibleRows.length ? '' : '<div class="empty"><p>Aucune rangée active ou aucun contenu disponible.</p><button class="btn" data-route="settings" data-focusable="true">Configurer l’accueil</button></div>'}`,
+    afterRender: () => {
+      const title = context.root.querySelector<HTMLElement>('[data-hero-title]');
+      const meta = context.root.querySelector<HTMLElement>('[data-hero-meta]');
+      const overview = context.root.querySelector<HTMLElement>('[data-hero-overview]');
+      const play = context.root.querySelector<HTMLButtonElement>('[data-hero-play]');
+      const details = context.root.querySelector<HTMLButtonElement>('[data-hero-details]');
+      let activeId = hero?.Id ?? '';
+
+      const updateHero = (item: JellyfinItem) => {
+        if (item.Id === activeId) return;
+        activeId = item.Id;
+        if (title) title.textContent = item.Name;
+        const metadata = itemMeta(item);
+        if (meta) { meta.textContent = metadata; meta.hidden = !metadata; }
+        if (overview) overview.textContent = item.Overview?.trim() || 'Aucun résumé disponible.';
+        if (details) details.dataset.openItem = item.Id;
+        if (play) { play.dataset.playItem = item.Id; play.hidden = !PLAYABLE_TYPES.has(item.Type); }
+        context.setBackdrop(item);
+      };
+
+      context.root.querySelectorAll<HTMLElement>('.media-row [data-open-item]').forEach((card) => {
+        const activate = () => {
+          const id = card.dataset.openItem;
+          const item = id ? context.items.get(id) : undefined;
+          if (item) updateHero(item);
+        };
+        card.addEventListener('focus', activate, { signal: context.signal });
+        card.addEventListener('pointerenter', activate, { signal: context.signal });
+      });
+    },
   };
 }
