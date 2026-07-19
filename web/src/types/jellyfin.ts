@@ -49,6 +49,15 @@ export interface JellyfinMediaStream {
   IsDefault?: boolean;
   IsForced?: boolean;
   SupportsExternalStream?: boolean;
+  DeliveryUrl?: string;
+  Title?: string;
+  ChannelLayout?: string;
+}
+
+export interface JellyfinChapter {
+  StartPositionTicks: number;
+  Name?: string;
+  ImageTag?: string;
 }
 
 export interface JellyfinMediaSource {
@@ -62,6 +71,9 @@ export interface JellyfinMediaSource {
   TranscodingUrl?: string;
   DirectStreamUrl?: string;
   MediaStreams?: JellyfinMediaStream[];
+  Bitrate?: number;
+  Size?: number;
+  VideoType?: string;
 }
 
 export interface JellyfinItem {
@@ -96,6 +108,7 @@ export interface JellyfinItem {
   ParentBackdropItemId?: string;
   PrimaryImageAspectRatio?: number;
   MediaSources?: JellyfinMediaSource[];
+  Chapters?: JellyfinChapter[];
   UserData?: JellyfinUserData;
   DateCreated?: string;
   PremiereDate?: string;
