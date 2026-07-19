@@ -4,6 +4,7 @@ import { formatRuntime } from '../../core/time';
 import { demoItems } from '../../demo/catalog';
 import type { JellyfinItem, QueryResult } from '../../types/jellyfin';
 import { mediaRow } from '../../ui/media';
+import { openAddToPlaylistDialog, renderPlaylistDetail } from '../playlists/playlists';
 
 const CHILD_TYPES: Record<string, string | undefined> = {
   BoxSet: 'Movie,Series',
@@ -79,6 +80,7 @@ export async function renderDetail(context: ScreenContext, id: string): Promise<
   if (!item) throw new Error('Contenu introuvable.');
   context.items.set(item.Id, item);
   context.setBackdrop(item);
+  if (item.Type === 'Playlist') return renderPlaylistDetail(context, item);
 
   const people = syntheticPeople(item);
   const [children, extras, similar] = await Promise.all([
@@ -101,10 +103,11 @@ export async function renderDetail(context: ScreenContext, id: string): Promise<
   const genres = item.Genres?.join(' • ') ?? '';
   const relatedSections = [
     people.length ? mediaRow('Distribution et équipe', `people:${item.Id}`, people, { api: context.api, demo: context.demo, showTitles: true }) : '',
-    children.length ? mediaRow(item.Type === 'Person' ? 'Filmographie' : item.Type === 'MusicAlbum' ? 'Titres' : 'Contenu', `children:${item.Id}`, children, { api: context.api, demo: context.demo, showTitles: true, landscape: item.Type === 'Playlist' }) : '',
+    children.length ? mediaRow(item.Type === 'Person' ? 'Filmographie' : item.Type === 'MusicAlbum' ? 'Titres' : 'Contenu', `children:${item.Id}`, children, { api: context.api, demo: context.demo, showTitles: true }) : '',
     extras.length ? mediaRow('Bonus et contenus spéciaux', `extras:${item.Id}`, extras, { api: context.api, demo: context.demo, showTitles: true, landscape: true }) : '',
     similar.length ? mediaRow('Contenus similaires', `similar:${item.Id}`, similar, { api: context.api, demo: context.demo, showTitles: true }) : '',
   ].join('');
+  const canAddToPlaylist = !['Person', 'MusicArtist', 'Photo', 'PhotoAlbum', 'CollectionFolder', 'Folder', 'UserView'].includes(item.Type);
 
   return {
     html: `<section class="detail-layout"><div class="detail-content">
@@ -117,9 +120,14 @@ export async function renderDetail(context: ScreenContext, id: string): Promise<
         ${['Movie', 'Episode', 'Video', 'MusicVideo', 'Audio'].includes(item.Type) ? `<button class="btn primary" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:play" data-play-item="${item.Id}">▶ Lire</button>` : ''}
         <button class="btn" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:favorite" data-toggle-favorite="${item.Id}">${item.UserData?.IsFavorite ? '♥ Retirer' : '♡ Favori'}</button>
         ${!['Person', 'MusicArtist'].includes(item.Type) ? `<button class="btn" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:watched" data-toggle-watched="${item.Id}">${item.UserData?.Played ? '↶ Non vu' : '✓ Vu'}</button>` : ''}
+        ${canAddToPlaylist ? `<button class="btn" data-add-to-playlist="${item.Id}" data-focusable="true" data-focus-zone="detail-actions" data-focus-key="detail:playlist">＋ Playlist</button>` : ''}
       </div>
     </div></section>${seriesSection}${relatedSections}${technicalInfo(item)}`,
-    afterRender: item.Type === 'Series' ? () => {
+    afterRender: () => {
+      context.root.querySelector<HTMLButtonElement>('[data-add-to-playlist]')?.addEventListener('click', () => {
+        void openAddToPlaylistDialog(context, item).catch((error) => context.toast(error instanceof Error ? error.message : 'Playlists indisponibles.', 'error'));
+      }, { signal: context.signal });
+      if (item.Type !== 'Series') return;
       const episodeList = query<HTMLElement>(context.root, '#episode-list');
       let controller: AbortController | null = null;
       const loadSeason = async (seasonId: string) => {
@@ -145,8 +153,8 @@ export async function renderDetail(context: ScreenContext, id: string): Promise<
         button.classList.add('active');
         button.setAttribute('aria-selected', 'true');
         void loadSeason(button.dataset.seasonId!);
-      }));
+      }, { signal: context.signal }));
       if (initialSeasonId) void loadSeason(initialSeasonId);
-    } : undefined,
+    },
   };
 }
