@@ -16,6 +16,7 @@ export interface ScreenContext {
   setBackdrop: (item?: JellyfinItem | null) => void;
   toast: (message: string, tone?: 'neutral' | 'success' | 'error') => void;
   play: (item: JellyfinItem) => Promise<void>;
+  playAudioQueue: (items: JellyfinItem[], startIndex: number) => Promise<void>;
   rerender: () => void;
 }
 
