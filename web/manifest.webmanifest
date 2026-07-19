@@ -1,0 +1,15 @@
+{
+  "id": "./",
+  "name": "Wholphin Web",
+  "short_name": "Wholphin",
+  "description": "Client web responsive et indépendant pour les serveurs Jellyfin",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "background_color": "#15121c",
+  "theme_color": "#15121c",
+  "icons": [
+    {"src": "./assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}

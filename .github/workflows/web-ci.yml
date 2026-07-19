@@ -1,0 +1,111 @@
+name: Wholphin Web CI
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-ci.yml'
+  push:
+    branches:
+      - main
+      - agent/add-wholphin-web
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package.json
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set +e
+          npm install --no-audit --no-fund > npm-install.log 2>&1
+          status=$?
+          tail -n 120 npm-install.log
+          exit $status
+      - name: TypeScript strict check
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          status=$?
+          cat typecheck.log
+          exit $status
+      - name: ESLint
+        shell: bash
+        run: |
+          set +e
+          npm run lint > lint.log 2>&1
+          status=$?
+          cat lint.log
+          exit $status
+      - name: Unit tests
+        shell: bash
+        run: |
+          set +e
+          npm test > test.log 2>&1
+          status=$?
+          cat test.log
+          exit $status
+      - name: Production build
+        shell: bash
+        run: |
+          set +e
+          npm run build > build.log 2>&1
+          status=$?
+          cat build.log
+          exit $status
+      - name: Enforce initial asset budgets
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const files = [];
+          function walk(dir) { for (const name of fs.readdirSync(dir)) { const p = path.join(dir, name); const s = fs.statSync(p); s.isDirectory() ? walk(p) : files.push({ p, size: s.size }); } }
+          walk('dist/assets');
+          const js = files.filter(f => f.p.endsWith('.js'));
+          const css = files.filter(f => f.p.endsWith('.css'));
+          const initialJs = js.filter(f => !f.p.includes('hls')).reduce((sum, f) => sum + f.size, 0);
+          const cssSize = css.reduce((sum, f) => sum + f.size, 0);
+          if (initialJs > 260000) throw new Error(`JavaScript initial trop lourd: ${initialJs} octets`);
+          if (cssSize > 125000) throw new Error(`CSS trop lourd: ${cssSize} octets`);
+          console.log({ initialJs, cssSize, files });
+          NODE
+      - name: Install Chromium Firefox and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run responsive browser E2E tests
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v5
+        with:
+          name: wholphin-web-dist
+          path: web/dist
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() }}
+        with:
+          name: wholphin-web-diagnostics
+          path: |
+            web/npm-install.log
+            web/typecheck.log
+            web/lint.log
+            web/test.log
+            web/build.log
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
+          retention-days: 30
